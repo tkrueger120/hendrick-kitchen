@@ -784,9 +784,8 @@ async function acceptCustomItem() {
   addBOHLoading(name, bohId);
   const bohData = await generateBOH(name, desc, station, location);
   renderBOH(bohId, name, bohData);
+  populateKpiFromAccepted();
 }
-
-// Used by custom accept (bypasses card DOM lookup)
 function addToMenuPanelDirect(name, desc, station) {
   const out = document.getElementById('menuOutput');
   if (out.querySelector('.empty-output')) out.innerHTML='';
@@ -821,6 +820,7 @@ async function acceptItem(i) {
   addBOHLoading(name, bohId);
   const bohData = await generateBOH(name, desc, station, location);
   renderBOH(bohId, name, bohData);
+  populateKpiFromAccepted();
 }
 
 function addToMenuPanel(name, desc, station) {
@@ -1449,18 +1449,6 @@ function renderKpiResults() {
 const _origSendToPublish = sendToPublish;
 function sendToPublish() {
   _origSendToPublish();
-  populateKpiFromAccepted();
-}
-
-// Also populate KPI whenever an item is accepted
-const _origAcceptItem = acceptItem;
-async function acceptItem(i) {
-  await _origAcceptItem(i);
-  populateKpiFromAccepted();
-}
-const _origAcceptCustomItem = acceptCustomItem;
-async function acceptCustomItem() {
-  await _origAcceptCustomItem();
   populateKpiFromAccepted();
 }
 </script>

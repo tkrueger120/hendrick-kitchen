@@ -619,15 +619,7 @@ function changeKey() {
   document.getElementById('keyMsg').textContent = '';
   document.getElementById('apiKeyScreen').style.display = 'flex';
 }
-document.getElementById('keySubmitBtn') && document.getElementById('keySubmitBtn').addEventListener('click', saveApiKey);
 document.getElementById('apiKeyInput').addEventListener('keydown', function(e){ if(e.key==='Enter') saveApiKey(); });
-function changeKey() {
-  document.getElementById('apiKeyInput').value = '';
-  document.getElementById('keyError').textContent = '';
-  document.getElementById('apiKeyScreen').style.display = 'flex';
-}
-document.getElementById('keySubmitBtn').addEventListener('click', saveApiKey);
-document.getElementById('apiKeyInput').addEventListener('keydown', e => { if (e.key === 'Enter') saveApiKey(); });
 
 // ═══════════════════════════
 // TABS

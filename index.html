@@ -325,6 +325,7 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
     <button class="tab-btn" onclick="switchTab('kpi')" id="tabBtnKpi">
       KPIs <span class="tab-badge" id="kpiBadge">0</span>
     </button>
+    <button class="tab-btn" onclick="switchTab('style')" id="tabBtnStyle">Style</button>
   </div>
   <div class="header-right">
     <div class="api-status"><div class="api-dot"></div>API Connected</div>
@@ -343,10 +344,11 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
       <div class="panel-label">Location</div>
       <select class="dk-input" id="locationSelect">
         <option>Hendrick House</option>
-        <option>Alpha Delta Pi</option>
-        <option>Kappa Kappa Gamma</option>
-        <option>Sigma Chi</option>
-        <option>Beta Theta Pi</option>
+        <option>Delta Delta Delta</option>
+        <option>Alpha Phi</option>
+        <option>Sig Ep</option>
+        <option>ADPhi</option>
+        <option>Delta Tau</option>
         <option>Phi Delta Theta</option>
       </select>
     </div>
@@ -413,10 +415,11 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
       <div class="panel-label">Location</div>
       <select class="dk-input" id="pubLocation" onchange="renderMenuCard()">
         <option>Hendrick House</option>
-        <option>Alpha Delta Pi</option>
-        <option>Kappa Kappa Gamma</option>
-        <option>Sigma Chi</option>
-        <option>Beta Theta Pi</option>
+        <option>Delta Delta Delta</option>
+        <option>Alpha Phi</option>
+        <option>Sig Ep</option>
+        <option>ADPhi</option>
+        <option>Delta Tau</option>
         <option>Phi Delta Theta</option>
       </select>
     </div>
@@ -458,10 +461,11 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
         <div class="panel-label">Location</div>
         <select class="dk-input" id="kpiLocation" onchange="updateKpiLocation()">
           <option>Hendrick House</option>
-          <option>Alpha Delta Pi</option>
-          <option>Kappa Kappa Gamma</option>
-          <option>Sigma Chi</option>
-          <option>Beta Theta Pi</option>
+          <option>Delta Delta Delta</option>
+          <option>Alpha Phi</option>
+          <option>Sig Ep</option>
+          <option>ADPhi</option>
+          <option>Delta Tau</option>
           <option>Phi Delta Theta</option>
         </select>
       </div>
@@ -505,6 +509,259 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
 
   </div>
 </div>
+
+<!-- ══ STYLE TAB ══ -->
+<div class="tab-content" id="tabStyle">
+  <div class="style-layout">
+
+    <div class="style-left">
+      <div class="panel-label" style="color:var(--warm-gray);margin-bottom:6px;">AI Recipe Style</div>
+      <div style="font-family:'DM Mono',monospace;font-size:0.56rem;color:#4A4540;line-height:1.7;margin-bottom:18px;">
+        These settings shape every suggestion the AI generates. Adjust per location — settings are saved automatically.
+      </div>
+
+      <div class="panel-label" style="margin-bottom:8px;">Location</div>
+      <select class="dk-input" id="styleLocation" onchange="loadStyleSettings()">
+        <option>Hendrick House</option>
+        <option>Delta Delta Delta</option>
+        <option>Alpha Phi</option>
+        <option>Sig Ep</option>
+        <option>ADPhi</option>
+        <option>Delta Tau</option>
+        <option>Phi Delta Theta</option>
+      </select>
+
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid #2A2520;">
+        <div class="panel-label" style="margin-bottom:12px;">Reset & Apply</div>
+        <button class="gen-btn" style="width:100%;font-size:0.85rem;padding:10px;" onclick="resetStyleSettings()">Reset to Defaults</button>
+        <div style="font-family:'DM Mono',monospace;font-size:0.54rem;color:#4A4540;margin-top:10px;line-height:1.6;text-align:center;">
+          Changes apply immediately to all new suggestions in the Build tab.
+        </div>
+      </div>
+    </div>
+
+    <div class="style-right">
+      <div class="style-grid" id="styleGrid"></div>
+    </div>
+
+  </div>
+</div>
+
+<style>
+/* ══ STYLE TAB ══ */
+#tabStyle { flex-direction:row; }
+.style-layout { display:grid; grid-template-columns:260px 1fr; width:100%; overflow:hidden; }
+.style-left { background:var(--ink); padding:24px 20px; display:flex; flex-direction:column; gap:14px; border-right:1px solid #2A2520; overflow-y:auto; }
+.style-right { background:#EDEAE4; padding:28px 32px; overflow-y:auto; }
+.style-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:16px; }
+
+.slider-card {
+  background:#fff; border:1px solid var(--mist); border-radius:8px;
+  padding:20px 22px; display:flex; flex-direction:column; gap:12px;
+}
+.slider-card-label {
+  font-family:'DM Mono',monospace; font-size:0.58rem; letter-spacing:0.14em;
+  text-transform:uppercase; color:var(--warm-gray);
+}
+.slider-ends {
+  display:flex; justify-content:space-between; align-items:center; gap:12px;
+}
+.slider-end-label {
+  font-family:'Playfair Display',serif; font-size:0.82rem; color:var(--ink);
+  flex:0 0 auto; max-width:110px; line-height:1.3;
+}
+.slider-end-label.right { text-align:right; }
+.slider-wrap { flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; }
+.style-slider {
+  width:100%; -webkit-appearance:none; appearance:none;
+  height:4px; border-radius:2px; outline:none; cursor:pointer;
+  background: linear-gradient(to right, var(--rust) 0%, var(--rust) 50%, var(--mist) 50%, var(--mist) 100%);
+}
+.style-slider::-webkit-slider-thumb {
+  -webkit-appearance:none; appearance:none;
+  width:18px; height:18px; border-radius:50%;
+  background:var(--ink); cursor:pointer;
+  border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,0.2);
+  transition:background 0.2s;
+}
+.style-slider::-webkit-slider-thumb:hover { background:var(--rust); }
+.style-slider::-moz-range-thumb {
+  width:18px; height:18px; border-radius:50%;
+  background:var(--ink); cursor:pointer; border:2px solid #fff;
+}
+.slider-value-badge {
+  font-family:'DM Mono',monospace; font-size:0.6rem; font-weight:500;
+  color:var(--rust); letter-spacing:0.06em;
+}
+.style-preview-box {
+  background:var(--ink); border-radius:6px; padding:14px 16px; margin-top:16px;
+  grid-column:1/-1;
+}
+.style-preview-label {
+  font-family:'DM Mono',monospace; font-size:0.56rem; letter-spacing:0.14em;
+  text-transform:uppercase; color:var(--warm-gray); margin-bottom:8px;
+}
+.style-preview-text {
+  font-family:'DM Sans',sans-serif; font-size:0.78rem; color:var(--cream);
+  line-height:1.7;
+}
+</style>
+
+<script>
+/* ══ STYLE TAB JS ══ */
+const STYLE_SLIDERS = [
+  { id:'spicy',    label:'Spice Level',    left:'Mild',          right:'Spicy',        default:5 },
+  { id:'healthy',  label:'Health Focus',   left:'Indulgent',     right:'Health-Forward', default:5 },
+  { id:'asian',    label:'Asian Influence',left:'Less Asian',    right:'More Asian',   default:5 },
+  { id:'seasonal', label:'Seasonality',    left:'Year-Round',    right:'Highly Seasonal', default:7 },
+  { id:'comfort',  label:'Comfort Food',   left:'Light & Fresh', right:'Comfort Food', default:5 },
+  { id:'hip',      label:'Trendy vs Classic', left:'Traditional', right:'Hip & Trendy', default:5 },
+  { id:'global',   label:'Global Cuisine', left:'American',      right:'World Cuisine', default:6 },
+  { id:'protein',  label:'Protein Focus',  left:'Plant-Forward', right:'Meat-Forward', default:6 },
+  { id:'complex',  label:'Dish Complexity',left:'Simple & Quick',right:'Chef-Driven',  default:6 },
+  { id:'portion',  label:'Portion Style',  left:'Light Portions',right:'Generous Portions', default:6 },
+  { id:'premium',  label:'Ingredient Quality', left:'Budget-Conscious', right:'Premium Ingredients', default:5 },
+  { id:'variety',  label:'Menu Variety',   left:'Consistent',    right:'Adventurous',  default:6 },
+];
+
+// styleSettings[location][sliderId] = value (0-10)
+let styleSettings = {};
+
+function getStyleSettings(loc) {
+  if (!styleSettings[loc]) {
+    styleSettings[loc] = {};
+    STYLE_SLIDERS.forEach(s => { styleSettings[loc][s.id] = s.default; });
+  }
+  return styleSettings[loc];
+}
+
+function loadStyleSettings() {
+  const loc = document.getElementById('styleLocation').value;
+  const settings = getStyleSettings(loc);
+  renderStyleGrid(loc, settings);
+}
+
+function renderStyleGrid(loc, settings) {
+  const grid = document.getElementById('styleGrid');
+  grid.innerHTML = '';
+
+  STYLE_SLIDERS.forEach(s => {
+    const val = settings[s.id] ?? s.default;
+    const card = document.createElement('div');
+    card.className = 'slider-card';
+    card.innerHTML = `
+      <div class="slider-card-label">${s.label}</div>
+      <div class="slider-ends">
+        <div class="slider-end-label">${s.left}</div>
+        <div class="slider-wrap">
+          <input type="range" class="style-slider" id="slider_${s.id}"
+            min="0" max="10" value="${val}"
+            oninput="onSliderChange('${loc}','${s.id}',this.value)">
+          <div class="slider-value-badge" id="badge_${s.id}">${sliderLabel(val)}</div>
+        </div>
+        <div class="slider-end-label right">${s.right}</div>
+      </div>`;
+    grid.appendChild(card);
+    // Set gradient
+    updateSliderGradient(document.getElementById(`slider_${s.id}`), val);
+  });
+
+  // Style prompt preview
+  const preview = document.createElement('div');
+  preview.className = 'style-preview-box';
+  preview.id = 'stylePreview';
+  preview.innerHTML = `
+    <div class="style-preview-label">How this affects suggestions</div>
+    <div class="style-preview-text" id="stylePreviewText">${buildStyleSummary(loc)}</div>`;
+  grid.appendChild(preview);
+}
+
+function sliderLabel(val) {
+  val = parseInt(val);
+  if (val <= 2) return 'Low';
+  if (val <= 4) return 'Moderate–Low';
+  if (val === 5) return 'Balanced';
+  if (val <= 7) return 'Moderate–High';
+  if (val <= 9) return 'High';
+  return 'Max';
+}
+
+function updateSliderGradient(el, val) {
+  const pct = (val / 10) * 100;
+  el.style.background = `linear-gradient(to right, var(--rust) 0%, var(--rust) ${pct}%, var(--mist) ${pct}%, var(--mist) 100%)`;
+}
+
+function onSliderChange(loc, id, val) {
+  val = parseInt(val);
+  styleSettings[loc][id] = val;
+  document.getElementById(`badge_${id}`).textContent = sliderLabel(val);
+  updateSliderGradient(document.getElementById(`slider_${id}`), val);
+  const preview = document.getElementById('stylePreviewText');
+  if (preview) preview.textContent = buildStyleSummary(loc);
+}
+
+function resetStyleSettings() {
+  const loc = document.getElementById('styleLocation').value;
+  STYLE_SLIDERS.forEach(s => { styleSettings[loc] = styleSettings[loc] || {}; styleSettings[loc][s.id] = s.default; });
+  loadStyleSettings();
+}
+
+function buildStyleSummary(loc) {
+  const s = getStyleSettings(loc);
+  const notes = [];
+  if (s.spicy >= 7) notes.push('bold spice levels');
+  else if (s.spicy <= 3) notes.push('mild, approachable flavors');
+  if (s.healthy >= 7) notes.push('health-conscious ingredients');
+  else if (s.healthy <= 3) notes.push('indulgent, rich dishes');
+  if (s.asian >= 7) notes.push('strong Asian cuisine influence');
+  else if (s.asian <= 3) notes.push('minimal Asian influence');
+  if (s.seasonal >= 7) notes.push('highly seasonal ingredients');
+  if (s.comfort >= 7) notes.push('hearty comfort food');
+  else if (s.comfort <= 3) notes.push('light and fresh preparations');
+  if (s.hip >= 7) notes.push('trendy, chef-driven concepts');
+  else if (s.hip <= 3) notes.push('classic, traditional recipes');
+  if (s.global >= 7) notes.push('diverse world cuisines');
+  else if (s.global <= 3) notes.push('American-focused menus');
+  if (s.protein >= 7) notes.push('meat-forward proteins');
+  else if (s.protein <= 3) notes.push('plant-forward proteins');
+  if (s.complex >= 7) notes.push('complex chef-driven technique');
+  else if (s.complex <= 3) notes.push('simple, quick-execute dishes');
+  if (s.portion >= 7) notes.push('generous portions');
+  if (s.premium >= 7) notes.push('premium ingredients');
+  if (s.variety >= 7) notes.push('adventurous variety');
+  else if (s.variety <= 3) notes.push('consistent, familiar options');
+  if (!notes.length) return `Balanced settings for ${loc} — no strong stylistic leanings applied.`;
+  return `For ${loc}: suggestions will favor ${notes.slice(0,-1).join(', ')}${notes.length>1?' and ':' '}${notes[notes.length-1]}.`;
+}
+
+// Build style prompt addendum — called from generateSuggestions
+function getStylePrompt(loc) {
+  const s = getStyleSettings(loc);
+  const lines = [];
+  const desc = (id, low, mid, high) => {
+    const v = s[id];
+    if (v <= 3) return low;
+    if (v >= 7) return high;
+    return mid;
+  };
+  lines.push(`Spice: ${desc('spicy','Very mild and approachable','Moderate spice acceptable','Bold and spicy flavors preferred')}`);
+  lines.push(`Health: ${desc('healthy','Rich, indulgent, comfort-focused','Balanced health/indulgence','Health-conscious, lean ingredients preferred')}`);
+  lines.push(`Asian influence: ${desc('asian','Avoid Asian cuisines','Asian cuisines welcome occasionally','Strongly lean toward Asian cuisines')}`);
+  lines.push(`Seasonality: ${desc('seasonal','Ignore seasons, use any ingredients','Somewhat seasonal','Use highly seasonal, peak-freshness ingredients')}`);
+  lines.push(`Comfort: ${desc('comfort','Light, fresh, refined preparations','Mix of comfort and light','Hearty comfort food strongly preferred')}`);
+  lines.push(`Trend: ${desc('hip','Classic and traditional recipes only','Mix of classic and trendy','Hip, trend-forward, Instagram-worthy concepts')}`);
+  lines.push(`Global: ${desc('global','Stick to American cuisine','Mix of American and global','Prioritize diverse world cuisines')}`);
+  lines.push(`Protein: ${desc('protein','Plant-forward, minimize meat','Balance plant and meat proteins','Meat-forward, protein-heavy dishes')}`);
+  lines.push(`Complexity: ${desc('complex','Simple, minimal-technique dishes','Moderate complexity','Chef-driven, complex technique welcome')}`);
+  lines.push(`Portions: ${desc('portion','Lighter, smaller portions','Standard portions','Generous, satisfying portions')}`);
+  lines.push(`Ingredients: ${desc('premium','Budget-conscious, value ingredients','Mid-range ingredients','Premium, high-quality ingredients')}`);
+  lines.push(`Variety: ${desc('variety','Stick to familiar, reliable dishes','Some variety','Adventurous, unexpected flavor combinations')}`);
+  return `\nStyle preferences for this location:\n${lines.join('\n')}`;
+}
+
+// Init style tab on first load
+loadStyleSettings();
+</script>
 
 <style>
 /* ══ KPI TAB STYLES ══ */
@@ -612,6 +869,7 @@ function init() {
   const nextMon = new Date(today); nextMon.setDate(today.getDate() + daysToMon);
   document.getElementById('pubWeekStart').value = nextMon.toISOString().split('T')[0];
   updateContextPill();
+  updateLocationUI();
   initPubDays();
   renderMenuCard();
 }
@@ -660,16 +918,56 @@ document.querySelectorAll('[data-station]').forEach(btn => {
     btn.classList.add('active'); selectedStation=btn.dataset.station; updateContextPill();
   });
 });
-document.getElementById('locationSelect').addEventListener('change', updateContextPill);
+document.getElementById('locationSelect').addEventListener('change', () => {
+  updateLocationUI();
+  updateContextPill();
+});
 document.getElementById('menuDate').addEventListener('change', updateContextPill);
+
+const GREEK_HOUSES = ['Delta Delta Delta','Alpha Phi','Sig Ep','ADPhi','Delta Tau','Phi Delta Theta'];
+
+function isGreekHouse(loc) {
+  return GREEK_HOUSES.includes(loc || document.getElementById('locationSelect').value);
+}
+
+function updateLocationUI() {
+  const loc = document.getElementById('locationSelect').value;
+  const greek = isGreekHouse(loc);
+  const stationGrid = document.getElementById('stationGrid');
+  const mealBtns = document.querySelectorAll('[data-meal]');
+
+  if (greek) {
+    // Greek: only Lunch and Dinner, no stations
+    stationGrid.style.opacity = '0.25';
+    stationGrid.style.pointerEvents = 'none';
+    // Hide Breakfast button
+    mealBtns.forEach(b => {
+      if (b.dataset.meal === 'Breakfast') { b.style.opacity='0.25'; b.style.pointerEvents='none'; }
+      else { b.style.opacity='1'; b.style.pointerEvents='auto'; }
+    });
+    // If currently on Breakfast, switch to Lunch
+    if (selectedMeal === 'Breakfast') {
+      selectedMeal = 'Lunch';
+      mealBtns.forEach(b => b.classList.remove('active'));
+      document.querySelector('[data-meal="Lunch"]').classList.add('active');
+    }
+    selectedStation = 'Homestyle'; // Greek houses use single menu, label as Homestyle
+  } else {
+    // HH: full UI
+    stationGrid.style.opacity = '1';
+    stationGrid.style.pointerEvents = 'auto';
+    mealBtns.forEach(b => { b.style.opacity='1'; b.style.pointerEvents='auto'; });
+  }
+}
 
 function updateContextPill() {
   const loc = document.getElementById('locationSelect').value;
   const date = document.getElementById('menuDate').value;
   const dateStr = date ? new Date(date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) : '—';
-  const station = selectedMeal==='Breakfast' ? 'All Stations' : selectedStation;
-  document.getElementById('contextPill').innerHTML = `<strong>${loc}</strong><br>${dateStr} · ${selectedMeal} · ${station}`;
-  document.getElementById('suggestionContext').textContent = `${selectedMeal} · ${station} · ${loc}`;
+  const greek = isGreekHouse(loc);
+  const stationLabel = greek ? 'Single Menu' : (selectedMeal==='Breakfast' ? 'All Stations' : selectedStation);
+  document.getElementById('contextPill').innerHTML = `<strong>${loc}</strong><br>${dateStr} · ${selectedMeal} · ${stationLabel}`;
+  document.getElementById('suggestionContext').textContent = `${selectedMeal} · ${stationLabel} · ${loc}`;
 }
 
 function getDescStyle(station) {
@@ -687,23 +985,28 @@ async function generateSuggestions() {
   const location = document.getElementById('locationSelect').value;
   const date = document.getElementById('menuDate').value;
   const theme = document.getElementById('themeInput').value.trim();
-  const station = selectedMeal==='Breakfast' ? 'Breakfast' : selectedStation;
+  const greek = isGreekHouse(location);
+  const station = greek ? 'Homestyle' : (selectedMeal==='Breakfast' ? 'Breakfast' : selectedStation);
   const grid = document.getElementById('suggestionsGrid');
   grid.innerHTML = `<div class="loading-state"><div class="spinner"></div><div class="loading-label">Generating options…</div></div>`;
   document.getElementById('generateBtn').disabled = true;
 
-  const isFrat = ['Sigma Chi','Beta Theta Pi','Phi Delta Theta'].some(n=>location.includes(n.split(' ')[0]));
-  const isSorority = ['Alpha Delta Pi','Kappa Kappa Gamma'].some(n=>location.includes(n.split(' ')[0]));
-  const audienceNote = isFrat ? `Fraternity house (${location}). Hearty, bold, protein-forward.`
-    : isSorority ? `Sorority house (${location}). Mix of fresh and satisfying comfort food.`
+  const isFrat = ['Sig Ep','ADPhi','Delta Tau','Phi Delta Theta'].some(n=>location.includes(n.split(' ')[0]));
+  const isSorority = ['Delta Delta Delta','Alpha Phi'].some(n=>location.includes(n.split(' ')[0]));
+  const audienceNote = isFrat ? `Fraternity house (${location}), ~40 members. Single cohesive meal — hearty, bold, protein-forward. No stations.`
+    : isSorority ? `Sorority house (${location}), ~40 members. Single cohesive meal — mix of fresh lighter options and satisfying comfort food. No stations.`
     : `Hendrick House, large residential dining hall at University of Illinois.`;
+
+  const greekMealNote = greek ? `This is a single unified ${selectedMeal} menu for the whole house — not broken into stations. Generate 3 complete meal options, each with a main protein/entree plus 2 sides.` : '';
 
   const prompt = `You are a professional chef consultant for a university food service company in Champaign, IL.
 Audience: ${audienceNote}
 ${theme?`Chef's note: "${theme}"`:''}
-Generate exactly 3 distinct menu options for Station: ${station}, Meal: ${selectedMeal}, Date: ${date}.
-For each: (1) creative dish name, (2) public-facing description: ${getDescStyle(station)}, (3) if Homestyle station: plant-based alt name only.
-Rules: vary cuisines · appeal to 18-22yr olds · no generic dishes · Sizzle=street food · Pizza=creative · Veggie Life=genuinely exciting.
+${greekMealNote}
+${getStylePrompt(location)}
+Generate exactly 3 distinct menu options for Meal: ${selectedMeal}, Date: ${date}${!greek?`, Station: ${station}`:''}.
+For each: (1) creative dish name${greek?' (can include sides e.g. "Harissa Chicken, Roasted Carrots, Herb Rice")':''}, (2) public-facing description: ${greek?'Rich, evocative 12-15 word description. Specific ingredients, cooking method, flavor. Sound elevated.':getDescStyle(station)}, (3) ${greek?'a plant-based alternative dish name only':'if Homestyle station: plant-based alt name only'}.
+Rules: vary cuisines · ${greek?'appeal to college-age members':'appeal to 18-22yr olds'} · no generic dishes${!greek?' · Sizzle=street food · Pizza=creative · Veggie Life=genuinely exciting':''}.
 Respond ONLY with valid JSON: {"options":[{"name":"","desc":"","vegAlt":null},{"name":"","desc":"","vegAlt":null},{"name":"","desc":"","vegAlt":null}]}`;
 
   try {
@@ -1215,7 +1518,7 @@ init();
 // Station visit % getters using assumption inputs
 function isGreekLocation() {
   const loc = document.getElementById('kpiLocation')?.value||'';
-  return loc !== 'Hendrick House';
+  return GREEK_HOUSES.includes(loc);
 }
 function getStationPct(station) {
   if (isGreekLocation()) return 1.0; // all members served at every station

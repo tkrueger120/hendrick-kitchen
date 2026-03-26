@@ -69,7 +69,7 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
 .tog-btn.active{background:var(--rust);border-color:var(--rust);color:#fff;}
 .context-pill{background:#2A2520;border-radius:5px;padding:9px 12px;font-family:'DM Mono',monospace;font-size:0.6rem;color:var(--warm-gray);letter-spacing:0.05em;line-height:1.7;}
 .context-pill strong{color:var(--gold);}
-.gen-btn{background:var(--rust);color:#fff;border:none;padding:12px;font-family:'Playfair Display',serif;font-size:0.95rem;border-radius:4px;cursor:pointer;transition:all 0.2s;margin-top:auto;}
+.gen-btn{background:var(--rust);color:#fff;border:none;padding:12px;font-family:'Playfair Display',serif;font-size:0.95rem;border-radius:4px;cursor:pointer;transition:all 0.2s;}
 .gen-btn:hover{background:#9A3D1F;transform:translateY(-1px);}
 .gen-btn:disabled{background:#3A3530;cursor:not-allowed;transform:none;}
 
@@ -371,8 +371,8 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
       <div class="panel-label">Theme / Notes (optional)</div>
       <input type="text" class="dk-input" id="themeInput" placeholder="e.g. 'Mardi Gras', 'high protein'">
     </div>
-    <div class="context-pill" id="contextPill">Select options then generate.</div>
     <button class="gen-btn" id="generateBtn" onclick="generateSuggestions()">Generate 3 Options →</button>
+    <div class="context-pill" id="contextPill">Select options then generate.</div>
   </div>
 
   <div class="build-right">
@@ -898,6 +898,7 @@ function sendToPublish() {
 
   document.getElementById('importNotice').innerHTML = `<strong>${acceptedItems.length} items</strong> imported from Build tab. Review below then export.`;
   renderMenuCard();
+  populateKpiFromAccepted();
   switchTab('publish');
 }
 
@@ -1445,12 +1446,7 @@ function renderKpiResults() {
     </div>`;
 }
 
-// Hook into sendToPublish to also populate KPI tab
-const _origSendToPublish = sendToPublish;
-function sendToPublish() {
-  _origSendToPublish();
-  populateKpiFromAccepted();
-}
+// KPI tab populated via direct calls in sendToPublish, acceptItem, acceptCustomItem
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://unpkg.com/docx@9.5.3/build/index.umd.js"></script>

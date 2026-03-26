@@ -291,21 +291,28 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
 <body>
 
 <!-- API KEY SCREEN -->
-<div id="apiKeyScreen">
-  <div class="key-box">
-    <div class="key-logo">Hendrick House <span>Kitchen</span></div>
-    <div class="key-title">Enter your Anthropic API Key</div>
-    <div class="key-desc">Stored only in this browser, sent directly to Anthropic. Get a key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> → API Keys.</div>
-    <div>
-      <div class="key-label">API Key</div>
-      <input class="key-input" id="apiKeyInput" type="text" placeholder="sk-ant-api03-…" autocomplete="off">
-    </div>
-    <p id="keyError" style="font-family:'DM Mono',monospace;font-size:0.6rem;color:#E07050;letter-spacing:0.08em;min-height:1em;margin:0;"></p>
-    <button class="key-submit" id="keySubmitBtn" type="button">Save & Open Tool →</button>
-    <button type="button" onclick="forceOpen()" style="background:transparent;border:1px solid #3A3530;color:var(--warm-gray);padding:10px;font-family:'DM Mono',monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;border-radius:5px;cursor:pointer;margin-top:-8px;">
-      Button not working? Click here instead
+<div id="apiKeyScreen" style="position:fixed;inset:0;background:#1A1714;display:flex;align-items:center;justify-content:center;z-index:9999;">
+  <div style="background:#222018;border:1px solid #3A3530;border-radius:10px;padding:44px 40px;max-width:460px;width:90%;display:flex;flex-direction:column;gap:18px;">
+    <div style="font-family:'Playfair Display',serif;font-size:1.15rem;color:#F7F3EC;">Hendrick House <span style="color:#C9973A;font-style:italic;">Kitchen</span></div>
+    <div style="font-family:'Playfair Display',serif;font-size:1.4rem;color:#F7F3EC;line-height:1.3;">Enter your Anthropic API Key</div>
+    <div style="font-size:0.8rem;color:#8A8278;line-height:1.7;">Stored only in this browser. Get a key at <a href="https://console.anthropic.com" target="_blank" style="color:#C9973A;">console.anthropic.com</a> → API Keys.</div>
+    <input id="apiKeyInput" type="text" placeholder="sk-ant-api03-…" autocomplete="off"
+      style="background:#2A2520;border:1px solid #3A3530;color:#F7F3EC;padding:11px 15px;font-family:'DM Mono',monospace;font-size:0.8rem;border-radius:5px;outline:none;width:100%;">
+    <div id="keyMsg" style="font-family:'DM Mono',monospace;font-size:0.6rem;color:#E07050;min-height:1em;"></div>
+    <button
+      style="background:#B84C27;color:#fff;border:none;padding:14px;font-family:'Playfair Display',serif;font-size:1rem;border-radius:5px;cursor:pointer;"
+      onclick="(function(){
+        var v=document.getElementById('apiKeyInput').value.trim();
+        if(!v){document.getElementById('keyMsg').textContent='Please paste your API key above.';return;}
+        window.API_KEY=v;
+        try{localStorage.setItem('hh_chef_api_key',v);}catch(e){}
+        document.getElementById('apiKeyScreen').style.display='none';
+      })()">
+      Save &amp; Open Tool →
     </button>
-    <div class="key-note">Saved in your browser — won't need to enter again on this device. Use "Change Key" in the header anytime.</div>
+    <div style="font-size:0.7rem;color:#4A4540;line-height:1.6;border-top:1px solid #2A2520;padding-top:14px;">
+      Your key is saved in this browser so you won't need to enter it again. Use "Change Key" in the header anytime.
+    </div>
   </div>
 </div>
 
@@ -585,8 +592,10 @@ function setPubCell(dayIdx, meal, station, name, desc) {
 // API KEY
 // ═══════════════════════════
 function init() {
-  const stored = localStorage.getItem('hh_chef_api_key');
-  if (stored) { API_KEY = stored; document.getElementById('apiKeyScreen').style.display = 'none'; }
+  try {
+    const stored = localStorage.getItem('hh_chef_api_key');
+    if (stored) { window.API_KEY = stored; document.getElementById('apiKeyScreen').style.display = 'none'; }
+  } catch(e) {}
   const today = new Date();
   document.getElementById('menuDate').value = today.toISOString().split('T')[0];
   const jsDay = today.getDay();
@@ -598,28 +607,20 @@ function init() {
   renderMenuCard();
 }
 function saveApiKey() {
-  const val = document.getElementById('apiKeyInput').value.trim();
-  const err = document.getElementById('keyError');
-  if (!val || val.length < 20) {
-    err.textContent = 'Please paste your full API key — it should be quite long.';
-    return;
-  }
-  if (!val.startsWith('sk-')) {
-    err.textContent = 'Key should start with sk- — double check and try again.';
-    return;
-  }
-  err.textContent = '';
-  API_KEY = val;
-  localStorage.setItem('hh_chef_api_key', val);
+  var v = document.getElementById('apiKeyInput').value.trim();
+  if (!v) { document.getElementById('keyMsg').textContent = 'Please paste your API key above.'; return; }
+  window.API_KEY = v;
+  try { localStorage.setItem('hh_chef_api_key', v); } catch(e) {}
   document.getElementById('apiKeyScreen').style.display = 'none';
 }
-function forceOpen() {
-  const val = document.getElementById('apiKeyInput').value.trim();
-  if (!val) { document.getElementById('keyError').textContent = 'Please paste your API key first.'; return; }
-  API_KEY = val;
-  localStorage.setItem('hh_chef_api_key', val);
-  document.getElementById('apiKeyScreen').style.display = 'none';
+function forceOpen() { saveApiKey(); }
+function changeKey() {
+  document.getElementById('apiKeyInput').value = '';
+  document.getElementById('keyMsg').textContent = '';
+  document.getElementById('apiKeyScreen').style.display = 'flex';
 }
+document.getElementById('keySubmitBtn') && document.getElementById('keySubmitBtn').addEventListener('click', saveApiKey);
+document.getElementById('apiKeyInput').addEventListener('keydown', function(e){ if(e.key==='Enter') saveApiKey(); });
 function changeKey() {
   document.getElementById('apiKeyInput').value = '';
   document.getElementById('keyError').textContent = '';
@@ -681,7 +682,7 @@ function getDescStyle(station) {
 // GENERATE
 // ═══════════════════════════
 async function generateSuggestions() {
-  if (!API_KEY) { changeKey(); return; }
+  if (!window.API_KEY) { changeKey(); return; }
   const location = document.getElementById('locationSelect').value;
   const date = document.getElementById('menuDate').value;
   const theme = document.getElementById('themeInput').value.trim();
@@ -707,7 +708,7 @@ Respond ONLY with valid JSON: {"options":[{"name":"","desc":"","vegAlt":null},{"
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':API_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      headers:{'Content-Type':'application/json','x-api-key':window.API_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})
     });
     if (!res.ok) { const e=await res.json(); throw new Error(e.error?.message||`HTTP ${res.status}`); }
@@ -773,7 +774,7 @@ async function acceptCustomItem() {
       const prompt = `Write a single public-facing menu description for this dish: "${name}". Station: ${station}. ${getDescStyle(station)} Respond with ONLY the description text, nothing else.`;
       const res = await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST',
-        headers:{'Content-Type':'application/json','x-api-key':API_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+        headers:{'Content-Type':'application/json','x-api-key':window.API_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
         body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:120,messages:[{role:'user',content:prompt}]})
       });
       const data = await res.json();
@@ -868,7 +869,7 @@ Requirements: 6-10 ingredients · 4-7 steps · 2-3 mistakes`;
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':API_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      headers:{'Content-Type':'application/json','x-api-key':window.API_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
       body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,messages:[{role:'user',content:prompt}]})
     });
     const data = await res.json();
@@ -1265,7 +1266,7 @@ function renderKpiDishList() {
 
 async function runKpiAnalysis() {
   if (!kpiDishes.length) { alert('No dishes to analyze — accept dishes in the Build tab first.'); return; }
-  if (!API_KEY) { changeKey(); return; }
+  if (!window.API_KEY) { changeKey(); return; }
 
   const resultsEl = document.getElementById('kpiResults');
   resultsEl.innerHTML = `<div class="kpi-loading"><div class="spinner"></div>Estimating cost & macros for ${kpiDishes.length} dishes…</div>`;
@@ -1291,7 +1292,7 @@ Respond ONLY with valid JSON array (same order as input):
     try {
       const res = await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST',
-        headers:{'Content-Type':'application/json','x-api-key':API_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+        headers:{'Content-Type':'application/json','x-api-key':window.API_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
         body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1200,messages:[{role:'user',content:prompt}]})
       });
       const data = await res.json();

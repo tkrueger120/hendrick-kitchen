@@ -468,16 +468,27 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
       <div class="kpi-import-notice" id="kpiImportNotice">No dishes imported yet.<br>Accept dishes in Build tab first.</div>
       <div id="kpiDishList" class="kpi-dish-list"></div>
       <button class="gen-btn" style="margin-top:16px;" onclick="runKpiAnalysis()">Analyze All Dishes →</button>
-      <div class="kpi-assumption-box">
-        <div class="panel-label" style="margin-bottom:10px;">Hendrick House Assumptions</div>
-        <div class="kpi-assume-grid">
-          <div class="kpi-assume-row"><span>Weekday Breakfast</span><input class="kpi-assume-input" id="asmBkfst" type="number" value="150"> customers</div>
-          <div class="kpi-assume-row"><span>Weekday Lunch</span><input class="kpi-assume-input" id="asmLunch" type="number" value="220"> customers</div>
-          <div class="kpi-assume-row"><span>Weekday Dinner</span><input class="kpi-assume-input" id="asmDinner" type="number" value="220"> customers</div>
-          <div class="kpi-assume-row"><span>Homestyle visit %</span><input class="kpi-assume-input" id="asmHS" type="number" value="60">%</div>
-          <div class="kpi-assume-row"><span>Veggie Life visit %</span><input class="kpi-assume-input" id="asmVL" type="number" value="50">%</div>
-          <div class="kpi-assume-row"><span>Sizzle visit %</span><input class="kpi-assume-input" id="asmSZ" type="number" value="40">%</div>
-          <div class="kpi-assume-row"><span>Pizza visit %</span><input class="kpi-assume-input" id="asmPZ" type="number" value="50">%</div>
+      <div class="kpi-assumption-box" id="assumptionBox">
+        <div id="hhAssumptions">
+          <div class="panel-label" style="margin-bottom:10px;">Hendrick House Assumptions</div>
+          <div class="kpi-assume-grid">
+            <div class="kpi-assume-row"><span>Weekday Breakfast</span><input class="kpi-assume-input" id="asmBkfst" type="number" value="150"> customers</div>
+            <div class="kpi-assume-row"><span>Weekday Lunch</span><input class="kpi-assume-input" id="asmLunch" type="number" value="220"> customers</div>
+            <div class="kpi-assume-row"><span>Weekday Dinner</span><input class="kpi-assume-input" id="asmDinner" type="number" value="220"> customers</div>
+            <div class="kpi-assume-row"><span>Homestyle visit %</span><input class="kpi-assume-input" id="asmHS" type="number" value="60">%</div>
+            <div class="kpi-assume-row"><span>Veggie Life visit %</span><input class="kpi-assume-input" id="asmVL" type="number" value="50">%</div>
+            <div class="kpi-assume-row"><span>Sizzle visit %</span><input class="kpi-assume-input" id="asmSZ" type="number" value="40">%</div>
+            <div class="kpi-assume-row"><span>Pizza visit %</span><input class="kpi-assume-input" id="asmPZ" type="number" value="50">%</div>
+          </div>
+        </div>
+        <div id="greekAssumptions" style="display:none;">
+          <div class="panel-label" style="margin-bottom:10px;" id="greekAssumptionTitle">House Headcount</div>
+          <div class="kpi-assume-grid">
+            <div class="kpi-assume-row"><span>Breakfast</span><input class="kpi-assume-input" id="asmGreekBkfst" type="number" value="35"> members</div>
+            <div class="kpi-assume-row"><span>Lunch</span><input class="kpi-assume-input" id="asmGreekLunch" type="number" value="40"> members</div>
+            <div class="kpi-assume-row"><span>Dinner</span><input class="kpi-assume-input" id="asmGreekDinner" type="number" value="40"> members</div>
+          </div>
+          <div style="font-family:'DM Mono',monospace;font-size:0.52rem;color:#4A4540;margin-top:8px;line-height:1.6;">Greek houses: all members served at each station — no visit % split applied.</div>
         </div>
       </div>
     </div>
@@ -837,8 +848,7 @@ function addBOHLoading(name, id) {
 
 function renderBOH(id, name, d) {
   const el = document.getElementById(id); if(!el) return;
-  const loc = document.getElementById('locationSelect').value;
-  const size = loc==='Hendrick House'?'60-80':'30-40';
+  const size = getServingSize();
   el.innerHTML=`
     <div class="boh-card-name">🔪 ${name}</div>
     <div class="boh-sec">Ingredients (~${size} servings)</div>
@@ -850,12 +860,12 @@ function renderBOH(id, name, d) {
 }
 
 async function generateBOH(name, desc, station, loc) {
-  const size = loc==='Hendrick House'?'60-80':'30-40';
+  const size = getServingSize();
   const prompt = `BOH kitchen reference for professional university dining chef.
 Dish: ${name} | ${desc} | Station: ${station} | Location: ${loc} (~${size} servings)
 Respond ONLY with valid JSON:
-{"ingredients":["item with quantity"],"steps":["step"],"timing":"one sentence","mistakes":["dish-specific mistake"]}
-Requirements: 6-10 ingredients · 4-7 steps · 2-3 mistakes`;
+{"ingredients":["item with quantity for ${size} servings"],"steps":["step"],"timing":"one sentence","mistakes":["dish-specific mistake"]}
+Requirements: 6-10 ingredients with realistic quantities for ${size} servings · 4-7 steps · 2-3 mistakes`;
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
@@ -1203,23 +1213,51 @@ init();
 // ═══════════════════════════════════════
 
 // Station visit % getters using assumption inputs
+function isGreekLocation() {
+  const loc = document.getElementById('kpiLocation')?.value||'';
+  return loc !== 'Hendrick House';
+}
 function getStationPct(station) {
+  if (isGreekLocation()) return 1.0; // all members served at every station
   const map = { 'Homestyle': 'asmHS', 'Veggie Life': 'asmVL', 'Sizzle': 'asmSZ', 'Pizza': 'asmPZ', 'Breakfast': null };
   const id = map[station];
   if (!id) return 1.0;
   return (parseFloat(document.getElementById(id)?.value)||0) / 100;
 }
 function getMealCustomers(meal) {
+  if (isGreekLocation()) {
+    if (meal==='Breakfast') return parseFloat(document.getElementById('asmGreekBkfst')?.value)||35;
+    if (meal==='Lunch') return parseFloat(document.getElementById('asmGreekLunch')?.value)||40;
+    if (meal==='Dinner') return parseFloat(document.getElementById('asmGreekDinner')?.value)||40;
+    return 40;
+  }
   if (meal==='Breakfast') return parseFloat(document.getElementById('asmBkfst')?.value)||150;
   if (meal==='Lunch') return parseFloat(document.getElementById('asmLunch')?.value)||220;
   if (meal==='Dinner') return parseFloat(document.getElementById('asmDinner')?.value)||220;
   return 0;
 }
+function getServingSize() {
+  if (isGreekLocation()) {
+    const loc = document.getElementById('kpiLocation')?.value||'';
+    // Use the greek dinner headcount as the base serving size for BOH notes
+    return parseFloat(document.getElementById('asmGreekDinner')?.value)||40;
+  }
+  return parseFloat(document.getElementById('asmDinner')?.value)||220;
+}
 
 // kpiDishes: array of { id, name, desc, meal, station, date, costPerServing, protein, carbs, fat }
 let kpiDishes = [];
 
-function updateKpiLocation() { renderKpiDishList(); }
+function updateKpiLocation() {
+  const loc = document.getElementById('kpiLocation')?.value||'';
+  const isGreek = loc !== 'Hendrick House';
+  document.getElementById('hhAssumptions').style.display = isGreek ? 'none' : 'block';
+  document.getElementById('greekAssumptions').style.display = isGreek ? 'block' : 'none';
+  if (isGreek) {
+    document.getElementById('greekAssumptionTitle').textContent = `${loc} Headcount`;
+  }
+  renderKpiDishList();
+}
 
 function populateKpiFromAccepted() {
   // Merge accepted items into kpiDishes, preserving any manually entered values

@@ -346,13 +346,23 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
       Publish <span class="tab-badge" id="publishBadge">0</span>
     </button>
     <button class="tab-btn" onclick="switchTab('kpi')" id="tabBtnKpi">
-      KPIs <span class="tab-badge" id="kpiBadge">0</span>
+      Analyze <span class="tab-badge" id="kpiBadge">0</span>
     </button>
     <button class="tab-btn" onclick="switchTab('style')" id="tabBtnStyle">Style</button>
   </div>
   <div class="header-right">
     <div id="chefNameDisplay" style="font-family:'DM Mono',monospace;font-size:0.58rem;color:var(--gold);letter-spacing:0.08em;padding:0 4px;"></div>
     <button class="btn-sm" onclick="switchChef()">Switch Chef</button>
+    <select id="masterLocation" onchange="onMasterLocationChange()"
+      style="background:#2A2520;border:1px solid #3A3530;color:#F7F3EC;padding:5px 10px;font-family:'DM Sans',sans-serif;font-size:0.78rem;border-radius:4px;outline:none;cursor:pointer;appearance:none;">
+      <option>Hendrick House</option>
+      <option>Delta Delta Delta</option>
+      <option>Alpha Phi</option>
+      <option>Sig Ep</option>
+      <option>ADPhi</option>
+      <option>Delta Tau</option>
+      <option>Phi Delta Theta</option>
+    </select>
     <div class="api-status"><div class="api-dot"></div>API Connected</div>
     <button class="btn-sm" onclick="changeKey()">Change Key</button>
   </div>
@@ -365,18 +375,7 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
       <div class="panel-label">Date</div>
       <input type="date" class="dk-input" id="menuDate">
     </div>
-    <div class="field-group">
-      <div class="panel-label">Location</div>
-      <select class="dk-input" id="locationSelect">
-        <option>Hendrick House</option>
-        <option>Delta Delta Delta</option>
-        <option>Alpha Phi</option>
-        <option>Sig Ep</option>
-        <option>ADPhi</option>
-        <option>Delta Tau</option>
-        <option>Phi Delta Theta</option>
-      </select>
-    </div>
+
     <div class="field-group">
       <div class="panel-label">Meal Service</div>
       <div class="toggle-row meal-row">
@@ -440,18 +439,8 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
 <!-- ══ PUBLISH TAB ══ -->
 <div class="tab-content" id="tabPublish">
   <div class="pub-left">
-    <div class="field-group">
-      <div class="panel-label">Location</div>
-      <select class="dk-input" id="pubLocation" onchange="renderMenuCard()">
-        <option>Hendrick House</option>
-        <option>Delta Delta Delta</option>
-        <option>Alpha Phi</option>
-        <option>Sig Ep</option>
-        <option>ADPhi</option>
-        <option>Delta Tau</option>
-        <option>Phi Delta Theta</option>
-      </select>
-    </div>
+<input type="hidden" id="pubLocation" value="Hendrick House">
+<input type="hidden" id="locationSelect" value="Hendrick House">
     <div class="field-group">
       <div class="panel-label">Week Starting (Monday)</div>
       <input type="date" class="dk-input" id="pubWeekStart" onchange="renderMenuCard()">
@@ -486,18 +475,7 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
     <!-- LEFT: dish input list -->
     <div class="kpi-left">
       <div class="panel-label" style="color:var(--warm-gray);margin-bottom:14px;">Dishes to Analyze</div>
-      <div class="kpi-location-row">
-        <div class="panel-label">Location</div>
-        <select class="dk-input" id="kpiLocation" onchange="updateKpiLocation()">
-          <option>Hendrick House</option>
-          <option>Delta Delta Delta</option>
-          <option>Alpha Phi</option>
-          <option>Sig Ep</option>
-          <option>ADPhi</option>
-          <option>Delta Tau</option>
-          <option>Phi Delta Theta</option>
-        </select>
-      </div>
+<input type="hidden" id="kpiLocation" value="Hendrick House">
       <div class="kpi-import-notice" id="kpiImportNotice">No dishes imported yet.<br>Accept dishes in Build tab first.</div>
       <div id="kpiDishList" class="kpi-dish-list"></div>
       <button class="gen-btn" style="margin-top:16px;" onclick="runKpiAnalysis()">Analyze All Dishes →</button>
@@ -550,15 +528,7 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
       </div>
 
       <div class="panel-label" style="margin-bottom:8px;">Location</div>
-      <select class="dk-input" id="styleLocation" onchange="loadStyleSettings()">
-        <option>Hendrick House</option>
-        <option>Delta Delta Delta</option>
-        <option>Alpha Phi</option>
-        <option>Sig Ep</option>
-        <option>ADPhi</option>
-        <option>Delta Tau</option>
-        <option>Phi Delta Theta</option>
-      </select>
+      <input type="hidden" id="styleLocation" value="Hendrick House">
 
       <div style="margin-top:20px;padding-top:16px;border-top:1px solid #2A2520;">
         <div class="panel-label" style="margin-bottom:12px;">Reset & Apply</div>
@@ -959,7 +929,7 @@ function saveCurrentSession() {
   data.pubData = pubData;
   data.pubActiveDays = pubActiveDays;
   data.pubWeekStart = document.getElementById('pubWeekStart').value;
-  data.pubLocation = document.getElementById('pubLocation').value;
+  data.masterLocation = document.getElementById('masterLocation').value;
   data.styleSettings = styleSettings;
   saveChefData(currentChef, data);
 }
@@ -968,16 +938,24 @@ function loadChefSession(name) {
   const data = getChefData(name);
   if (data.pubData) {
     pubData = data.pubData;
-    // Convert string keys back (JSON serializes object keys as strings)
     const converted = {};
     Object.entries(pubData).forEach(([k,v]) => { converted[parseInt(k)] = v; });
     pubData = converted;
   }
   if (data.pubActiveDays) pubActiveDays = data.pubActiveDays;
   if (data.pubWeekStart) document.getElementById('pubWeekStart').value = data.pubWeekStart;
-  if (data.pubLocation) document.getElementById('pubLocation').value = data.pubLocation;
+  if (data.masterLocation) {
+    document.getElementById('masterLocation').value = data.masterLocation;
+    // Sync all hidden inputs
+    ['locationSelect','pubLocation','kpiLocation','styleLocation'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = data.masterLocation;
+    });
+    updateLocationUI();
+    updateContextPill();
+  }
   if (data.styleSettings) styleSettings = data.styleSettings;
-  // Re-render publish tab
+  // Re-render
   const container = document.getElementById('pubDayList');
   container.innerHTML = '';
   initPubDays();
@@ -1062,7 +1040,7 @@ document.querySelectorAll('[data-station]').forEach(btn => {
     btn.classList.add('active'); selectedStation=btn.dataset.station; updateContextPill();
   });
 });
-document.getElementById('locationSelect').addEventListener('change', () => {
+document.getElementById('masterLocationLegacy_DISABLED', () => {
   acceptedItems = [];
   acceptedCount = 0;
   document.getElementById('acceptedCount').textContent = '0 items accepted';
@@ -1079,11 +1057,11 @@ document.getElementById('menuDate').addEventListener('change', updateContextPill
 const GREEK_HOUSES = ['Delta Delta Delta','Alpha Phi','Sig Ep','ADPhi','Delta Tau','Phi Delta Theta'];
 
 function isGreekHouse(loc) {
-  return GREEK_HOUSES.includes(loc || document.getElementById('locationSelect').value);
+  return GREEK_HOUSES.includes(loc || document.getElementById('masterLocation').value);
 }
 
 function updateLocationUI() {
-  const loc = document.getElementById('locationSelect').value;
+  const loc = document.getElementById('masterLocation').value;
   const greek = isGreekHouse(loc);
   const stationGrid = document.getElementById('stationGrid');
   const mealBtns = document.querySelectorAll('[data-meal]');
@@ -1114,13 +1092,42 @@ function updateLocationUI() {
 }
 
 function updateContextPill() {
-  const loc = document.getElementById('locationSelect').value;
+  const loc = document.getElementById('masterLocation').value;
   const date = document.getElementById('menuDate').value;
   const dateStr = date ? new Date(date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) : '—';
   const greek = isGreekHouse(loc);
   const stationLabel = greek ? 'Single Menu' : (selectedMeal==='Breakfast' ? 'All Stations' : selectedStation);
   document.getElementById('contextPill').innerHTML = `<strong>${loc}</strong><br>${dateStr} · ${selectedMeal} · ${stationLabel}`;
   document.getElementById('suggestionContext').textContent = `${selectedMeal} · ${stationLabel} · ${loc}`;
+}
+
+function onMasterLocationChange() {
+  const loc = document.getElementById('masterLocation').value;
+  // Sync all hidden location inputs
+  ['locationSelect','pubLocation','kpiLocation','styleLocation'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = loc;
+  });
+  // Clear build tab
+  acceptedItems = [];
+  acceptedCount = 0;
+  document.getElementById('acceptedCount').textContent = '0 items accepted';
+  document.getElementById('menuOutput').innerHTML = '<div class="empty-output">Accepted items<br>appear here</div>';
+  document.getElementById('bohOutput').innerHTML = '<div class="empty-output">Prep notes<br>appear here</div>';
+  document.getElementById('suggestionsGrid').innerHTML = '<div class="empty-state"><div class="empty-icon">&#127869;</div><div class="empty-label">Configure and generate options</div></div>';
+  const pb = document.getElementById('publishBadge');
+  pb.textContent = '0'; pb.classList.remove('show');
+  // Clear inventory
+  document.getElementById('inventoryInput').value = '';
+  // Update UI for location type
+  updateLocationUI();
+  updateContextPill();
+  // Update publish card
+  renderMenuCard();
+  // Update style tab
+  loadStyleSettings();
+  // Update KPI
+  updateKpiLocation();
 }
 
 function getDescStyle(station) {
@@ -1135,7 +1142,7 @@ function getDescStyle(station) {
 // ═══════════════════════════
 async function generateSuggestions() {
   if (!window.API_KEY) { changeKey(); return; }
-  const location = document.getElementById('locationSelect').value;
+  const location = document.getElementById('masterLocation').value;
   const date = document.getElementById('menuDate').value;
   const theme = document.getElementById('themeInput').value.trim();
   const inventory = document.getElementById('inventoryInput').value.trim();
@@ -1218,7 +1225,7 @@ async function acceptCustomItem() {
 
   const station = selectedMeal==='Breakfast' ? 'Breakfast' : selectedStation;
   const date = document.getElementById('menuDate').value;
-  const location = document.getElementById('locationSelect').value;
+  const location = document.getElementById('masterLocation').value;
   let desc = descEl.value.trim();
 
   const card = document.getElementById('card-custom');
@@ -1273,7 +1280,7 @@ async function acceptItem(i) {
   const desc = card.querySelector('.dish-desc').textContent;
   const station = selectedMeal==='Breakfast' ? 'Breakfast' : selectedStation;
   const date = document.getElementById('menuDate').value;
-  const location = document.getElementById('locationSelect').value;
+  const location = document.getElementById('masterLocation').value;
 
   card.classList.add('accepted');
   card.querySelector('.card-actions').innerHTML = `<div class="accepted-badge">✓ Added to menu</div>`;
@@ -1419,7 +1426,7 @@ function getWeekRangeLabel() {
 function renderMenuCard() {
   const card = document.getElementById('menuCard');
   if (!card) return;
-  const loc = document.getElementById('pubLocation')?.value||'Hendrick House';
+  const loc = document.getElementById('masterLocation').value||'Hendrick House';
   const dates = getWeekDates();
   const numDays = pubActiveDays.length||5;
 
@@ -1522,7 +1529,7 @@ function renderMenuCard() {
 function copyMenuText() {
   const cards = document.querySelectorAll('.menu-card-item');
   if (!cards.length) { alert('No items accepted yet.'); return; }
-  const loc = document.getElementById('locationSelect').value;
+  const loc = document.getElementById('masterLocation').value;
   const date = document.getElementById('menuDate').value;
   const dateStr = date ? new Date(date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}) : '';
   let text = `${loc.toUpperCase()}\n${dateStr}\n${'─'.repeat(40)}\n\n`;
@@ -1647,7 +1654,7 @@ async function exportWord() {
     ]
   });
 
-  const loc = document.getElementById('pubLocation')?.value||'Hendrick House';
+  const loc = document.getElementById('masterLocation').value||'Hendrick House';
   const doc = new Document({sections:[{
     properties:{page:{size:{width:12240,height:15840,orientation:PageOrientation.LANDSCAPE},margin:{top:560,right:560,bottom:560,left:560}}},
     children:[

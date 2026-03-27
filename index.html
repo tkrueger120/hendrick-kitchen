@@ -461,7 +461,7 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
   </div>
 
   <div class="pub-right">
-    <div class="pub-preview-label">Live Preview — 7 days × 9 rows (Breakfast + 4 Lunch stations + 4 Dinner stations)</div>
+    <div class="pub-preview-label">Live Preview — <span style="color:var(--sage);">&#9632;</span> Protein &nbsp;<span style="color:var(--gold);">&#9632;</span> Carbs &nbsp;<span style="color:var(--rust);">&#9632;</span> Fat &nbsp;· Macros appear after running Analyze tab</div>
     <div style="overflow:auto;width:100%;">
       <div id="menuCard"></div>
     </div>
@@ -1427,44 +1427,74 @@ function renderMenuCard() {
   const card = document.getElementById('menuCard');
   if (!card) return;
   const loc = document.getElementById('masterLocation').value||'Hendrick House';
+  const greek = isGreekHouse(loc);
   const dates = getWeekDates();
   const numDays = pubActiveDays.length||5;
 
-  // Card width: label col (72px) + day cols
-  const dayColW = 130;
-  const totalW = 72 + numDays * dayColW;
-  card.style.width = totalW + 'px';
+  // ── Macro lookup helper ──
+  // Find macro data for a dish name from kpiDishes (if Analyze tab has been run)
+  function getMacros(dishName) {
+    if (!dishName) return null;
+    const match = kpiDishes.find(d => d.name === dishName && (parseFloat(d.protein)||parseFloat(d.carbs)||parseFloat(d.fat)));
+    if (!match) return null;
+    const p = parseFloat(match.protein)||0;
+    const c2 = parseFloat(match.carbs)||0;
+    const f = parseFloat(match.fat)||0;
+    const cal = Math.round(p*4 + c2*4 + f*9);
+    const total = p*4 + c2*4 + f*9 || 1;
+    const pp = Math.round((p*4/total)*100);
+    const cp = Math.round((c2*4/total)*100);
+    const fp = 100-pp-cp;
+    return { p:Math.round(p), c:Math.round(c2), f:Math.round(f), cal, pp, cp, fp };
+  }
 
-  // Build day header cells
+  function macroHTML(dishName) {
+    const m = getMacros(dishName);
+    if (!m) return '';
+    return `<div style="margin-top:4px;">
+      <div style="display:flex;height:4px;border-radius:2px;overflow:hidden;gap:1px;margin-bottom:3px;">
+        <div style="width:${m.pp}%;background:#4A6741;"></div>
+        <div style="width:${m.cp}%;background:#C9973A;"></div>
+        <div style="width:${m.fp}%;background:#B84C27;"></div>
+      </div>
+      <div style="font-family:'DM Mono',monospace;font-size:0.46rem;color:#8A8278;letter-spacing:0.04em;">
+        ${m.p}g P · ${m.c}g C · ${m.f}g F · ${m.cal} cal
+      </div>
+    </div>`;
+  }
+
+  // ── Cell with macro ──
+  function cell(dayIdx, meal, station) {
+    const { name, desc } = getPubCell(dayIdx, meal, station);
+    return `<td class="mc-cell">
+      ${name
+        ? `<div class="mc-cell-name">${name}</div>
+           ${desc?`<div class="mc-cell-desc">${desc}</div>`:''}
+           ${macroHTML(name)}`
+        : `<div class="mc-cell-empty">—</div>`}
+    </td>`;
+  }
+
+  // ── Day headers ──
   const dayHeaders = pubActiveDays.map(di => `
     <th class="mc-day-th">
       <div class="mc-day-name">${DAYS[di]}</div>
       <div class="mc-day-date">${dates[di]||''}</div>
     </th>`).join('');
 
-  // Helper: render a content cell
-  function cell(dayIdx, meal, station, rowClass) {
-    const { name, desc } = getPubCell(dayIdx, meal, station);
-    return `<td class="mc-cell">
-      ${name
-        ? `<div class="mc-cell-name">${name}</div>${desc?`<div class="mc-cell-desc">${desc}</div>`:''}`
-        : `<div class="mc-cell-empty">—</div>`}
-    </td>`;
-  }
-
-  // Helper: build a station row
-  function stationRow(meal, station, rowClass, labelFirst) {
-    const labelCell = labelFirst ? `
-      <td class="mc-row-label" rowspan="1">
-        <div class="mc-row-label-inner">
-          <span class="mc-row-station">${station}</span>
-        </div>
-      </td>` : '';
-    const cells = pubActiveDays.map(di => cell(di, meal, station, rowClass)).join('');
-    return `<tr class="${rowClass}">${labelCell}${cells}</tr>`;
-  }
-
-  card.innerHTML = `
+  // ── Banner — different for HH vs Greek ──
+  const greekHouseName = loc + ' Kitchen';
+  const bannerHTML = greek ? `
+    <div class="mc-banner">
+      <div>
+        <div class="mc-logo" style="font-size:1.3rem;">${greekHouseName}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:0.5rem;letter-spacing:0.14em;text-transform:uppercase;color:#8A8278;margin-top:3px;">University of Illinois · Urbana-Champaign</div>
+      </div>
+      <div class="mc-banner-right">
+        <div class="mc-week-label">Menu for the week of</div>
+        <div class="mc-week-dates">${getWeekRangeLabel()}</div>
+      </div>
+    </div>` : `
     <div class="mc-banner">
       <div class="mc-logo">Hendrick House <span>Kitchen</span></div>
       <div class="mc-banner-right">
@@ -1472,11 +1502,55 @@ function renderMenuCard() {
         <div class="mc-week-dates">${getWeekRangeLabel()}</div>
         <div class="mc-location-tag">${loc}</div>
       </div>
-    </div>
-    <div class="mc-accent"></div>
+    </div>`;
 
+  // ── Greek layout: no label column, just Lunch + Dinner rows ──
+  if (greek) {
+    const totalW = numDays * 150;
+    card.style.width = totalW + 'px';
+    card.innerHTML = `
+      ${bannerHTML}
+      <div class="mc-accent"></div>
+      <table class="mc-table">
+        <thead>
+          <tr>${dayHeaders}</tr>
+        </thead>
+        <tbody>
+          <tr class="mc-group-header">
+            <td colspan="${numDays}"><span class="mc-group-label">Lunch</span></td>
+          </tr>
+          <tr class="mc-row-hs">
+            ${pubActiveDays.map(di => cell(di,'Lunch','Homestyle')).join('')}
+          </tr>
+          <tr class="mc-group-header">
+            <td colspan="${numDays}"><span class="mc-group-label">Dinner</span></td>
+          </tr>
+          <tr class="mc-row-hs">
+            ${pubActiveDays.map(di => cell(di,'Dinner','Homestyle')).join('')}
+          </tr>
+        </tbody>
+      </table>
+      <div class="mc-footer">
+        <div class="mc-footer-text">${loc} · University of Illinois · Hendrick House Food Services</div>
+        <div class="mc-footer-text">Menu subject to change</div>
+      </div>`;
+    return;
+  }
+
+  // ── HH layout: full 9-row format with label column ──
+  const totalW = 72 + numDays * 130;
+  card.style.width = totalW + 'px';
+
+  function stationRow(meal, station, rowClass) {
+    const labelCell = `<td class="mc-row-label"><div class="mc-row-label-inner"><span class="mc-row-station">${station}</span></div></td>`;
+    const cells = pubActiveDays.map(di => cell(di, meal, station)).join('');
+    return `<tr class="${rowClass}">${labelCell}${cells}</tr>`;
+  }
+
+  card.innerHTML = `
+    ${bannerHTML}
+    <div class="mc-accent"></div>
     <table class="mc-table">
-      <!-- Day header row -->
       <thead>
         <tr>
           <th style="width:72px;background:#F7F3EC;border:1px solid #E8E2D9;"></th>
@@ -1484,39 +1558,29 @@ function renderMenuCard() {
         </tr>
       </thead>
       <tbody>
-
-        <!-- BREAKFAST group -->
         <tr class="mc-group-header">
           <td colspan="${numDays+1}"><span class="mc-group-label">Breakfast</span></td>
         </tr>
         <tr class="mc-row-hs">
-          <td class="mc-row-label">
-            <div class="mc-row-label-inner"><span class="mc-row-meal">Brkfst</span></div>
-          </td>
-          ${pubActiveDays.map(di => cell(di,'Breakfast','Breakfast','')).join('')}
+          <td class="mc-row-label"><div class="mc-row-label-inner"><span class="mc-row-meal">Brkfst</span></div></td>
+          ${pubActiveDays.map(di => cell(di,'Breakfast','Breakfast')).join('')}
         </tr>
-
-        <!-- LUNCH group -->
         <tr class="mc-group-header">
           <td colspan="${numDays+1}"><span class="mc-group-label">Lunch</span></td>
         </tr>
-        ${stationRow('Lunch','Homestyle','mc-row-hs',true)}
-        ${stationRow('Lunch','Sizzle','mc-row-sz',true)}
-        ${stationRow('Lunch','Veggie Life','mc-row-vl',true)}
-        ${stationRow('Lunch','Pizza','mc-row-pz',true)}
-
-        <!-- DINNER group -->
+        ${stationRow('Lunch','Homestyle','mc-row-hs')}
+        ${stationRow('Lunch','Sizzle','mc-row-sz')}
+        ${stationRow('Lunch','Veggie Life','mc-row-vl')}
+        ${stationRow('Lunch','Pizza','mc-row-pz')}
         <tr class="mc-group-header">
           <td colspan="${numDays+1}"><span class="mc-group-label">Dinner</span></td>
         </tr>
-        ${stationRow('Dinner','Homestyle','mc-row-hs',true)}
-        ${stationRow('Dinner','Sizzle','mc-row-sz',true)}
-        ${stationRow('Dinner','Veggie Life','mc-row-vl',true)}
-        ${stationRow('Dinner','Pizza','mc-row-pz',true)}
-
+        ${stationRow('Dinner','Homestyle','mc-row-hs')}
+        ${stationRow('Dinner','Sizzle','mc-row-sz')}
+        ${stationRow('Dinner','Veggie Life','mc-row-vl')}
+        ${stationRow('Dinner','Pizza','mc-row-pz')}
       </tbody>
     </table>
-
     <div class="mc-footer">
       <div class="mc-footer-text">hendrickhouse.com · 904 W. Green St, Urbana, IL</div>
       <div class="mc-footer-text">Menu subject to change · (217) 365-8000</div>

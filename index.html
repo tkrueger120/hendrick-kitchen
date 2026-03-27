@@ -1972,7 +1972,7 @@ init();
 
 // Station visit % getters using assumption inputs
 function isGreekLocation() {
-  const loc = document.getElementById('kpiLocation')?.value||'';
+  const loc = document.getElementById('masterLocation')?.value || document.getElementById('kpiLocation')?.value || '';
   return GREEK_HOUSES.includes(loc);
 }
 function getStationPct(station) {
@@ -1996,8 +1996,6 @@ function getMealCustomers(meal) {
 }
 function getServingSize() {
   if (isGreekLocation()) {
-    const loc = document.getElementById('kpiLocation')?.value||'';
-    // Use the greek dinner headcount as the base serving size for BOH notes
     return parseFloat(document.getElementById('asmGreekDinner')?.value)||40;
   }
   return parseFloat(document.getElementById('asmDinner')?.value)||220;
@@ -2007,8 +2005,8 @@ function getServingSize() {
 let kpiDishes = [];
 
 function updateKpiLocation() {
-  const loc = document.getElementById('kpiLocation')?.value||'';
-  const isGreek = loc !== 'Hendrick House';
+  const loc = document.getElementById('masterLocation')?.value || '';
+  const isGreek = GREEK_HOUSES.includes(loc);
   document.getElementById('hhAssumptions').style.display = isGreek ? 'none' : 'block';
   document.getElementById('greekAssumptions').style.display = isGreek ? 'block' : 'none';
   if (isGreek) {

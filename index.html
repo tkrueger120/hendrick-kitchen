@@ -533,6 +533,37 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
       <div class="panel-label" style="margin-bottom:8px;">Location</div>
       <input type="hidden" id="styleLocation" value="Hendrick House">
 
+      <!-- WEEKLY BUDGET -->
+      <div style="background:#1A1714;border:1px solid #2A2520;border-radius:6px;padding:16px 14px;display:flex;flex-direction:column;gap:12px;">
+        <div class="panel-label" style="color:var(--gold);margin-bottom:0;">Weekly Food Budget</div>
+
+        <div>
+          <div class="panel-label" style="margin-bottom:6px;">Total Weekly Budget</div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-family:'DM Mono',monospace;font-size:0.8rem;color:var(--warm-gray);">$</span>
+            <input type="number" id="weeklyBudget" min="0" step="50" placeholder="e.g. 2500"
+              style="flex:1;background:#2A2520;border:1px solid #3A3530;color:var(--cream);padding:8px 10px;font-family:'DM Mono',monospace;font-size:0.82rem;border-radius:4px;outline:none;transition:border-color 0.2s;"
+              oninput="updateBudgetCalcs()" onfocus="this.style.borderColor='var(--gold)'" onblur="this.style.borderColor='#3A3530'">
+          </div>
+        </div>
+
+        <div id="budgetBreakdown" style="display:none;font-family:'DM Mono',monospace;font-size:0.58rem;color:var(--warm-gray);line-height:1.9;border-top:1px solid #2A2520;padding-top:10px;"></div>
+
+        <div>
+          <div class="panel-label" style="margin-bottom:6px;">Max Premium Dishes / Week</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <input type="number" id="maxPremium" min="0" max="14" value="3"
+              style="width:56px;background:#2A2520;border:1px solid #3A3530;color:var(--cream);padding:8px 10px;font-family:'DM Mono',monospace;font-size:0.82rem;border-radius:4px;outline:none;text-align:center;transition:border-color 0.2s;"
+              onfocus="this.style.borderColor='var(--gold)'" onblur="this.style.borderColor='#3A3530'">
+            <span style="font-family:'DM Mono',monospace;font-size:0.56rem;color:#4A4540;line-height:1.6;">dishes with premium proteins (salmon, steak, shrimp, lamb…)</span>
+          </div>
+        </div>
+
+        <div style="font-family:'DM Mono',monospace;font-size:0.52rem;color:#4A4540;line-height:1.6;">
+          Budget and premium limits feed directly into AI suggestions on the Build tab.
+        </div>
+      </div>
+
       <div style="margin-top:20px;padding-top:16px;border-top:1px solid #2A2520;">
         <div class="panel-label" style="margin-bottom:12px;">Reset & Apply</div>
         <button class="gen-btn" style="width:100%;font-size:0.85rem;padding:10px;" onclick="resetStyleSettings()">Reset to Defaults</button>
@@ -612,18 +643,21 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
 <script>
 /* ══ STYLE TAB JS ══ */
 const STYLE_SLIDERS = [
-  { id:'spicy',    label:'Spice Level',    left:'Mild',          right:'Spicy',        default:5 },
-  { id:'healthy',  label:'Health Focus',   left:'Indulgent',     right:'Health-Forward', default:5 },
-  { id:'asian',    label:'Asian Influence',left:'Less Asian',    right:'More Asian',   default:5 },
-  { id:'seasonal', label:'Seasonality',    left:'Year-Round',    right:'Highly Seasonal', default:7 },
-  { id:'comfort',  label:'Comfort Food',   left:'Light & Fresh', right:'Comfort Food', default:5 },
-  { id:'hip',      label:'Trendy vs Classic', left:'Traditional', right:'Hip & Trendy', default:5 },
-  { id:'global',   label:'Global Cuisine', left:'American',      right:'World Cuisine', default:6 },
-  { id:'protein',  label:'Protein Focus',  left:'Plant-Forward', right:'Meat-Forward', default:6 },
-  { id:'complex',  label:'Dish Complexity',left:'Simple & Quick',right:'Chef-Driven',  default:6 },
-  { id:'portion',  label:'Portion Style',  left:'Light Portions',right:'Generous Portions', default:6 },
-  { id:'premium',  label:'Ingredient Quality', left:'Budget-Conscious', right:'Premium Ingredients', default:5 },
-  { id:'variety',  label:'Menu Variety',   left:'Consistent',    right:'Adventurous',  default:6 },
+  { id:'spicy',    label:'Spice Level',       left:'Mild',           right:'Spicy',            default:5 },
+  { id:'healthy',  label:'Health Focus',      left:'Indulgent',      right:'Health-Forward',   default:5 },
+  { id:'asian',    label:'Asian Influence',   left:'Less Asian',     right:'More Asian',       default:5 },
+  { id:'seasonal', label:'Seasonality',       left:'Year-Round',     right:'Highly Seasonal',  default:7 },
+  { id:'comfort',  label:'Comfort Food',      left:'Light & Fresh',  right:'Comfort Food',     default:5 },
+  { id:'hip',      label:'Trendy vs Classic', left:'Traditional',    right:'Hip & Trendy',     default:5 },
+  { id:'global',   label:'Global Cuisine',    left:'American',       right:'World Cuisine',    default:6 },
+  { id:'protein',  label:'Protein Focus',     left:'Plant-Forward',  right:'Meat-Forward',     default:6 },
+  { id:'complex',  label:'Dish Complexity',   left:'Simple & Quick', right:'Chef-Driven',      default:6 },
+  { id:'portion',  label:'Portion Style',     left:'Light Portions', right:'Generous Portions',default:6 },
+  { id:'premium',  label:'Ingredient Quality',left:'Budget-Conscious',right:'Premium Ingredients', default:5 },
+  { id:'variety',  label:'Menu Variety',      left:'Consistent',     right:'Adventurous',      default:6 },
+  { id:'premfreq', label:'Premium Proteins / Week', left:'0x / week', right:'5x / week',
+    default:2, min:0, max:5, step:1, isCount:true,
+    note:'Steak, salmon, halibut, scallops, lobster, crab, lamb, duck, sea bass' },
 ];
 
 // styleSettings[location][sliderId] = value (0-10)
@@ -649,23 +683,35 @@ function renderStyleGrid(loc, settings) {
 
   STYLE_SLIDERS.forEach(s => {
     const val = settings[s.id] ?? s.default;
+    const isCount = s.isCount || false;
+    const min = s.min ?? 0;
+    const max = s.max ?? 10;
+    const step = s.step ?? 1;
+    const badgeText = isCount ? `${val}x / week` : sliderLabel(val);
+    const gradientPct = ((val - min) / (max - min)) * 100;
+
     const card = document.createElement('div');
     card.className = 'slider-card';
+    // Premium freq slider spans full width
+    if (isCount) card.style.gridColumn = '1 / -1';
+
     card.innerHTML = `
       <div class="slider-card-label">${s.label}</div>
+      ${s.note ? `<div style="font-family:'DM Mono',monospace;font-size:0.52rem;color:var(--warm-gray);letter-spacing:0.04em;line-height:1.5;margin-bottom:2px;">Premium = ${s.note}</div>` : ''}
       <div class="slider-ends">
         <div class="slider-end-label">${s.left}</div>
         <div class="slider-wrap">
           <input type="range" class="style-slider" id="slider_${s.id}"
-            min="0" max="10" value="${val}"
-            oninput="onSliderChange('${loc}','${s.id}',this.value)">
-          <div class="slider-value-badge" id="badge_${s.id}">${sliderLabel(val)}</div>
+            min="${min}" max="${max}" step="${step}" value="${val}"
+            oninput="onSliderChange('${loc}','${s.id}',this.value,${isCount})">
+          <div class="slider-value-badge" id="badge_${s.id}">${badgeText}</div>
         </div>
         <div class="slider-end-label right">${s.right}</div>
       </div>`;
     grid.appendChild(card);
-    // Set gradient
-    updateSliderGradient(document.getElementById(`slider_${s.id}`), val);
+
+    const el = document.getElementById(`slider_${s.id}`);
+    el.style.background = `linear-gradient(to right, var(--rust) 0%, var(--rust) ${gradientPct}%, var(--mist) ${gradientPct}%, var(--mist) 100%)`;
   });
 
   // Style prompt preview
@@ -693,11 +739,24 @@ function updateSliderGradient(el, val) {
   el.style.background = `linear-gradient(to right, var(--rust) 0%, var(--rust) ${pct}%, var(--mist) ${pct}%, var(--mist) 100%)`;
 }
 
-function onSliderChange(loc, id, val) {
+function onSliderChange(loc, id, val, isCount) {
   val = parseInt(val);
+  if (!styleSettings[loc]) styleSettings[loc] = {};
   styleSettings[loc][id] = val;
-  document.getElementById(`badge_${id}`).textContent = sliderLabel(val);
-  updateSliderGradient(document.getElementById(`slider_${id}`), val);
+  const s = STYLE_SLIDERS.find(sl => sl.id === id);
+  const min = s?.min ?? 0;
+  const max = s?.max ?? 10;
+  const badgeText = isCount ? `${val}x / week` : sliderLabel(val);
+  document.getElementById(`badge_${id}`).textContent = badgeText;
+  // Update gradient
+  const el = document.getElementById(`slider_${id}`);
+  const pct = ((val - min) / (max - min)) * 100;
+  el.style.background = `linear-gradient(to right, var(--rust) 0%, var(--rust) ${pct}%, var(--mist) ${pct}%, var(--mist) 100%)`;
+  // Sync maxPremium number input if this is the premfreq slider
+  if (id === 'premfreq') {
+    const mp = document.getElementById('maxPremium');
+    if (mp) mp.value = val;
+  }
   const preview = document.getElementById('stylePreviewText');
   if (preview) preview.textContent = buildStyleSummary(loc);
 }
@@ -732,6 +791,8 @@ function buildStyleSummary(loc) {
   if (s.premium >= 7) notes.push('premium ingredients');
   if (s.variety >= 7) notes.push('adventurous variety');
   else if (s.variety <= 3) notes.push('consistent, familiar options');
+  const pf = s.premfreq ?? 2;
+  notes.push(`max ${pf} premium protein${pf !== 1 ? 's' : ''}/week (steak, salmon, halibut, etc.)`);
   if (!notes.length) return `Balanced settings for ${loc} — no strong stylistic leanings applied.`;
   return `For ${loc}: suggestions will favor ${notes.slice(0,-1).join(', ')}${notes.length>1?' and ':' '}${notes[notes.length-1]}.`;
 }
@@ -758,7 +819,68 @@ function getStylePrompt(loc) {
   lines.push(`Portions: ${desc('portion','Lighter, smaller portions','Standard portions','Generous, satisfying portions')}`);
   lines.push(`Ingredients: ${desc('premium','Budget-conscious, value ingredients','Mid-range ingredients','Premium, high-quality ingredients')}`);
   lines.push(`Variety: ${desc('variety','Stick to familiar, reliable dishes','Some variety','Adventurous, unexpected flavor combinations')}`);
+
+  // Budget + premium constraints
+  const targetCPM = calcTargetCostPerMeal();
+  const premFreq = s.premfreq ?? 2;
+  const maxPremium = document.getElementById('maxPremium')?.value || premFreq;
+
+  if (targetCPM) {
+    lines.push(`Food cost target: Aim for approximately $${targetCPM.toFixed(2)} food cost per serving. Choose ingredients and preparations that respect this budget. For reference, premium proteins cost roughly: salmon $8-12/lb, halibut $15-20/lb, sea bass $18-25/lb, scallops $20-30/lb, steak (ribeye/NY strip) $15-25/lb, lamb $12-18/lb, duck $8-12/lb, lobster/crab $20-40/lb. Budget proteins: chicken thighs $2-3/lb, ground beef $4-6/lb, pork shoulder $3-5/lb, eggs $0.30/each, legumes/tofu $1-3/lb.`);
+  }
+
+  lines.push(`Premium protein frequency: Allow exactly ${premFreq}x premium protein dishes per week maximum. PREMIUM proteins are: steak (any cut), salmon, halibut, sea bass, scallops, lobster, crab, lamb, duck. All other proteins (chicken, ground beef, pork, turkey, eggs, tofu, legumes, tilapia, pollock, shrimp in small quantities) are standard. For this specific suggestion, only suggest a premium protein if the weekly budget of ${premFreq} hasn't been filled yet — otherwise default to standard proteins.`);
+
   return `\nStyle preferences for this location:\n${lines.join('\n')}`;
+}
+
+function calcTargetCostPerMeal() {
+  const budget = parseFloat(document.getElementById('weeklyBudget')?.value)||0;
+  if (!budget) return null;
+  const loc = document.getElementById('masterLocation').value;
+  const greek = isGreekHouse(loc);
+  let totalMeals = 0;
+  if (greek) {
+    // Greek: 10 meals per week (3 lunches + 5 dinners) × headcount
+    const lunchCount = parseFloat(document.getElementById('asmGreekLunch')?.value)||40;
+    const dinnerCount = parseFloat(document.getElementById('asmGreekDinner')?.value)||40;
+    totalMeals = (3 * lunchCount) + (5 * dinnerCount);
+  } else {
+    // HH: 5 days × (breakfast + lunch stations × pct + dinner stations × pct)
+    const bk = parseFloat(document.getElementById('asmBkfst')?.value)||150;
+    const lu = parseFloat(document.getElementById('asmLunch')?.value)||220;
+    const di = parseFloat(document.getElementById('asmDinner')?.value)||220;
+    const hsP = (parseFloat(document.getElementById('asmHS')?.value)||60)/100;
+    const vlP = (parseFloat(document.getElementById('asmVL')?.value)||50)/100;
+    const szP = (parseFloat(document.getElementById('asmSZ')?.value)||40)/100;
+    const pzP = (parseFloat(document.getElementById('asmPZ')?.value)||50)/100;
+    const lunchServings = lu * (hsP + vlP + szP + pzP);
+    const dinnerServings = di * (hsP + vlP + szP + pzP);
+    totalMeals = (5 * bk) + (5 * lunchServings) + (5 * dinnerServings);
+  }
+  return totalMeals > 0 ? budget / totalMeals : null;
+}
+
+function updateBudgetCalcs() {
+  const budget = parseFloat(document.getElementById('weeklyBudget')?.value)||0;
+  const breakdown = document.getElementById('budgetBreakdown');
+  if (!budget || !breakdown) return;
+  const cpm = calcTargetCostPerMeal();
+  const loc = document.getElementById('masterLocation').value;
+  const greek = isGreekHouse(loc);
+  if (cpm) {
+    const lunchCount = greek ? (parseFloat(document.getElementById('asmGreekLunch')?.value)||40) : (parseFloat(document.getElementById('asmLunch')?.value)||220);
+    const dinnerCount = greek ? (parseFloat(document.getElementById('asmGreekDinner')?.value)||40) : (parseFloat(document.getElementById('asmDinner')?.value)||220);
+    breakdown.style.display = 'block';
+    breakdown.innerHTML = `
+      <div style="color:var(--gold);font-size:0.62rem;margin-bottom:4px;">Weekly Budget: $${budget.toLocaleString()}</div>
+      <div>Target cost/serving: <strong style="color:var(--cream);">$${cpm.toFixed(2)}</strong></div>
+      <div>Lunch headcount: ${lunchCount} · Dinner: ${dinnerCount}</div>
+      ${greek ? '<div>10 meal services/week (3L + 5D)</div>' : '<div>5-day week · All stations included</div>'}
+    `;
+  } else {
+    breakdown.style.display = 'none';
+  }
 }
 
 // Init style tab on first load
@@ -934,6 +1056,8 @@ function saveCurrentSession() {
   data.pubWeekStart = document.getElementById('pubWeekStart').value;
   data.masterLocation = document.getElementById('masterLocation').value;
   data.styleSettings = styleSettings;
+  data.weeklyBudget = document.getElementById('weeklyBudget')?.value||'';
+  data.maxPremium = document.getElementById('maxPremium')?.value||'3';
   saveChefData(currentChef, data);
 }
 
@@ -958,6 +1082,13 @@ function loadChefSession(name) {
     updateContextPill();
   }
   if (data.styleSettings) styleSettings = data.styleSettings;
+  if (data.weeklyBudget && document.getElementById('weeklyBudget')) {
+    document.getElementById('weeklyBudget').value = data.weeklyBudget;
+    updateBudgetCalcs();
+  }
+  if (data.maxPremium && document.getElementById('maxPremium')) {
+    document.getElementById('maxPremium').value = data.maxPremium;
+  }
   // Re-render
   const container = document.getElementById('pubDayList');
   container.innerHTML = '';

@@ -370,7 +370,7 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
         onmouseover="this.style.borderColor='#C9973A'" onmouseout="this.style.borderColor='#3A3530'">
         Select week…
       </button>
-      <input type="week" id="weekPickerInput" onchange="onWeekPickerChange(this.value)"
+      <input type="date" id="weekPickerInput" onchange="onWeekPickerChange(this.value)"
         style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;top:0;left:0;">
     </div>
     <div class="api-status"><div class="api-dot"></div>API Connected</div>
@@ -1084,7 +1084,12 @@ function rebuildBuildPanel() {
     removeBtn.addEventListener('click', function() {
       removeItem(itemId, bohId, el.dataset.name);
     });
-    const stationDiv = document.createElement('div'); stationDiv.className='mci-station'; stationDiv.textContent=item.meal+' · '+item.station;
+    const loc2 = item.location || getLoc();
+    const greek2 = isGreekHouse(loc2);
+    const stationLabel = (greek2 || item.station === 'Breakfast') ? item.meal : item.meal + ' · ' + item.station;
+    const dateLabel = item.date ? new Date(item.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) : '';
+    const stationDiv = document.createElement('div'); stationDiv.className='mci-station';
+    stationDiv.textContent = stationLabel + (dateLabel ? ' · ' + dateLabel : '');
     const nameDiv = document.createElement('div'); nameDiv.className='mci-name'; nameDiv.textContent=item.name;
     const descDiv = document.createElement('div'); descDiv.className='mci-desc'; descDiv.textContent=item.desc;
     el.appendChild(removeBtn); el.appendChild(stationDiv); el.appendChild(nameDiv); el.appendChild(descDiv);
@@ -1310,15 +1315,9 @@ function renderWeekSelector() {
   if (!btn) return;
   const wk = getWeekKey();
   btn.textContent = wk ? weekLabel(wk) : 'Select week…';
-  // Also sync the week input value
-  if (wk) {
-    // Convert YYYY-MM-DD Monday to YYYY-W## format for input[type=week]
-    const d = new Date(wk+'T00:00:00');
-    const jan4 = new Date(d.getFullYear(),0,4);
-    const weekNum = Math.ceil(((d-jan4)/86400000 + jan4.getDay()+1)/7);
-    document.getElementById('weekPickerInput').value =
-      d.getFullYear()+'-W'+(weekNum<10?'0':'')+weekNum;
-  }
+  // Sync the date input to Monday of current week
+  const input = document.getElementById('weekPickerInput');
+  if (input && wk) input.value = wk;
   renderDayButtons();
 }
 
@@ -1338,25 +1337,17 @@ function setCurrentWeek(wk) {
     '<div class="empty-state"><div class="empty-icon">&#127869;</div><div class="empty-label">Configure and generate options</div></div>';
   // Reload staged items for this week
   syncAcceptedFromStaged();
-  // Re-render publish card and week button label
+  // Re-render publish card, week label, and KPI tab
   renderMenuCard();
   renderWeekSelector();
+  updateKpiLocation();
   updateContextPill();
 }
 
-function onWeekPickerChange(weekValue) {
-  // weekValue is like "2026-W14" — convert to Monday YYYY-MM-DD
-  if (!weekValue) return;
-  const [yearStr, weekStr] = weekValue.split('-W');
-  const year = parseInt(yearStr);
-  const week = parseInt(weekStr);
-  // ISO week to date: Jan 4 is always in week 1
-  const jan4 = new Date(year, 0, 4);
-  const startOfWeek1 = new Date(jan4);
-  startOfWeek1.setDate(jan4.getDate() - (jan4.getDay() || 7) + 1);
-  const monday = new Date(startOfWeek1);
-  monday.setDate(startOfWeek1.getDate() + (week-1)*7);
-  const monStr = monday.toISOString().split('T')[0];
+function onWeekPickerChange(dateValue) {
+  // dateValue is a plain YYYY-MM-DD — calculate Monday of that week
+  if (!dateValue) return;
+  const monStr = mondayOf(dateValue);
   if (currentChef) saveCurrentSession();
   addWeek(monStr);
 }
@@ -1785,7 +1776,12 @@ function addToMenuPanelDirect(name, desc, station) {
   removeBtn.addEventListener('click', function() {
     removeItem(itemId, bohId, this.closest('.menu-card-item').dataset.name);
   });
-  const stationDiv = document.createElement('div'); stationDiv.className='mci-station'; stationDiv.textContent=selectedMeal+' · '+station;
+  const locNow = getLoc();
+  const greekNow = isGreekHouse(locNow);
+  const stationLabelNow = (greekNow || selectedMeal === 'Breakfast') ? selectedMeal : selectedMeal + ' · ' + station;
+  const dateLabelNow = getSelectedDayDate() ? new Date(getSelectedDayDate()+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) : '';
+  const stationDiv = document.createElement('div'); stationDiv.className='mci-station';
+  stationDiv.textContent = stationLabelNow + (dateLabelNow ? ' · ' + dateLabelNow : '');
   const nameDiv = document.createElement('div'); nameDiv.className='mci-name'; nameDiv.textContent=name;
   const descDiv = document.createElement('div'); descDiv.className='mci-desc'; descDiv.textContent=desc;
   el.appendChild(removeBtn); el.appendChild(stationDiv); el.appendChild(nameDiv); el.appendChild(descDiv);
@@ -2361,7 +2357,7 @@ let manualKpiValues = {}; // { [dishName]: { costPerServing, protein, carbs, fat
 let kpiDishes = [];
 
 function getKpiLocation() {
-  return document.getElementById('masterLocation')?.value || 'Hendrick House';
+  return getLoc(); // Always reads from masterLocation — single source of truth
 }
 
 function updateKpiLocation() {
@@ -2392,6 +2388,7 @@ function populateKpiFromAccepted() {
         meal: item.meal,
         station: item.station,
         date: item.date,
+        location: item.location || loc,
         costPerServing: manual.costPerServing || '',
         protein: manual.protein || '',
         carbs: manual.carbs || '',
@@ -2421,7 +2418,11 @@ function renderKpiDishList() {
     const dateStr = dish.date ? new Date(dish.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) : '';
     row.innerHTML=`
       <div class="kpi-dish-name">${dish.name}</div>
-      <div class="kpi-dish-meta">${dish.meal} · ${dish.station}${dateStr?' · '+dateStr:''}</div>
+      <div class="kpi-dish-meta">${(() => {
+        const isGrk = isGreekHouse(dish.location || getLoc());
+        const stMeta = (isGrk || dish.station === 'Breakfast') ? dish.meal : dish.meal + ' · ' + dish.station;
+        return stMeta + (dateStr ? ' · ' + dateStr : '');
+      })()}</div>
       <div class="kpi-dish-inputs">
         <div class="kpi-dish-field"><label>Cost / serving ($)</label><input type="number" step="0.01" min="0" placeholder="e.g. 2.40" value="${dish.costPerServing}" oninput="saveManualkpi('${dish.name}','costPerServing',this.value);kpiDishes[${i}].costPerServing=this.value"></div>
         <div class="kpi-dish-field"><label>Protein (g)</label><input type="number" step="1" min="0" placeholder="g" value="${dish.protein}" oninput="saveManualkpi('${dish.name}','protein',this.value);kpiDishes[${i}].protein=this.value"></div>

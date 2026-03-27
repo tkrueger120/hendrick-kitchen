@@ -960,7 +960,14 @@ let selectedStation = 'Homestyle';
 let acceptedCount = 0;
 let acceptedItems = []; // { date, meal, station, name, desc, location }
 let pubActiveDays = [0,1,2,3,4]; // Mon–Fri default
-let pubData = {}; // pubData[dayIdx][rowKey] = { name:'', desc:'' }
+// allPubData[location][dayIdx][rowKey] = { name, desc }
+let allPubData = {};
+
+function getPubData() {
+  const loc = document.getElementById('masterLocation').value || 'Hendrick House';
+  if (!allPubData[loc]) allPubData[loc] = {};
+  return allPubData[loc];
+}
 
 function rowKey(meal, station) {
   if (meal === 'Breakfast') return 'breakfast';
@@ -969,13 +976,14 @@ function rowKey(meal, station) {
 
 function getPubCell(dayIdx, meal, station) {
   const key = rowKey(meal, station);
-  return pubData[dayIdx]?.[key] || { name:'', desc:'' };
+  return getPubData()[dayIdx]?.[key] || { name:'', desc:'' };
 }
 
 function setPubCell(dayIdx, meal, station, name, desc) {
-  if (!pubData[dayIdx]) pubData[dayIdx] = {};
+  const pd = getPubData();
+  if (!pd[dayIdx]) pd[dayIdx] = {};
   const key = rowKey(meal, station);
-  pubData[dayIdx][key] = { name, desc };
+  pd[dayIdx][key] = { name, desc };
 }
 
 // ═══════════════════════════
@@ -1051,7 +1059,7 @@ function saveCurrentSession() {
   if (!currentChef) return;
   const data = getChefData(currentChef);
   data.lastSaved = new Date().toISOString();
-  data.pubData = pubData;
+  data.pubData = allPubData;
   data.pubActiveDays = pubActiveDays;
   data.pubWeekStart = document.getElementById('pubWeekStart').value;
   data.masterLocation = document.getElementById('masterLocation').value;
@@ -1064,10 +1072,12 @@ function saveCurrentSession() {
 function loadChefSession(name) {
   const data = getChefData(name);
   if (data.pubData) {
-    pubData = data.pubData;
-    const converted = {};
-    Object.entries(pubData).forEach(([k,v]) => { converted[parseInt(k)] = v; });
-    pubData = converted;
+    allPubData = data.pubData;
+    Object.keys(allPubData).forEach(loc => {
+      const converted = {};
+      Object.entries(allPubData[loc]).forEach(([k,v]) => { converted[parseInt(k)] = v; });
+      allPubData[loc] = converted;
+    });
   }
   if (data.pubActiveDays) pubActiveDays = data.pubActiveDays;
   if (data.pubWeekStart) document.getElementById('pubWeekStart').value = data.pubWeekStart;
@@ -1492,7 +1502,10 @@ function sendToPublish() {
     const dayIdx = jsDay===0 ? 6 : jsDay-1;
     affectedDays.add(dayIdx);
   });
-  affectedDays.forEach(dayIdx => { pubData[dayIdx] = {}; });
+  affectedDays.forEach(dayIdx => {
+    const pd = getPubData();
+    pd[dayIdx] = {};
+  });
 
   // Now write accepted items — last accepted item for a slot wins
   acceptedItems.forEach(item => {
@@ -1525,8 +1538,9 @@ function sendToPublish() {
 // PUBLISH TAB
 // ═══════════════════════════
 function clearPublishData() {
-  if (!confirm('Clear all menu data for this week? This cannot be undone.')) return;
-  pubData = {};
+  if (!confirm('Clear all menu data for this location and week? This cannot be undone.')) return;
+  const loc = document.getElementById('masterLocation').value || 'Hendrick House';
+  allPubData[loc] = {};
   renderMenuCard();
   if (currentChef) saveCurrentSession();
   document.getElementById('importNotice').innerHTML = '<strong>0 items</strong> from Build tab.<br>Accept dishes then click <em>"→ Send to Publish Tab"</em>.';

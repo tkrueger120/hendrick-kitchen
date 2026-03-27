@@ -1064,6 +1064,7 @@ function saveCurrentSession() {
   data.pubWeekStart = document.getElementById('pubWeekStart').value;
   data.masterLocation = document.getElementById('masterLocation').value;
   data.styleSettings = styleSettings;
+  data.manualKpiValues = manualKpiValues;
   data.weeklyBudget = document.getElementById('weeklyBudget')?.value||'';
   data.maxPremium = document.getElementById('maxPremium')?.value||'3';
   saveChefData(currentChef, data);
@@ -1092,6 +1093,7 @@ function loadChefSession(name) {
     updateContextPill();
   }
   if (data.styleSettings) styleSettings = data.styleSettings;
+  if (data.manualKpiValues) manualKpiValues = data.manualKpiValues;
   if (data.weeklyBudget && document.getElementById('weeklyBudget')) {
     document.getElementById('weeklyBudget').value = data.weeklyBudget;
     updateBudgetCalcs();
@@ -1196,7 +1198,10 @@ document.getElementById('masterLocationLegacy_DISABLED', () => {
   updateLocationUI();
   updateContextPill();
 });
-document.getElementById('menuDate').addEventListener('change', updateContextPill);
+document.getElementById('menuDate').addEventListener('change', () => {
+  updateContextPill();
+  updateLocationUI(); // re-evaluate which meals are available for this day
+});
 
 const GREEK_HOUSES = ['Delta Delta Delta','Alpha Phi','Sig Ep','ADPhi','Delta Tau','Phi Delta Theta'];
 
@@ -1212,22 +1217,46 @@ function updateLocationUI() {
 
   const stationGroup = document.getElementById('stationFieldGroup');
   if (greek) {
-    // Greek: only Lunch and Dinner, no stations — hide station section entirely
+    // Greek: no stations, no breakfast
     if (stationGroup) stationGroup.style.display = 'none';
     stationGrid.style.opacity = '0';
     stationGrid.style.pointerEvents = 'none';
-    mealBtns.forEach(b => {
-      if (b.dataset.meal === 'Breakfast') { b.style.opacity='0.3'; b.style.pointerEvents='none'; }
-      else { b.style.opacity='1'; b.style.pointerEvents='auto'; }
-    });
-    if (selectedMeal === 'Breakfast') {
-      selectedMeal = 'Lunch';
-      mealBtns.forEach(b => b.classList.remove('active'));
-      document.querySelector('[data-meal="Lunch"]').classList.add('active');
-    }
     selectedStation = 'Homestyle';
+
+    // Determine which meals are available based on the selected date
+    const dateVal = document.getElementById('menuDate').value;
+    let lunchAvail = true, dinnerAvail = true;
+    if (dateVal) {
+      const jsDay = new Date(dateVal + 'T00:00:00').getDay();
+      // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+      // Greek schedule: Mon-Thu L+D, Fri L only, Sat none, Sun D only
+      lunchAvail  = [1,2,3,4,5].includes(jsDay); // Mon-Fri
+      dinnerAvail = [0,1,2,3,4].includes(jsDay); // Sun-Thu
+    }
+
+    mealBtns.forEach(b => {
+      if (b.dataset.meal === 'Breakfast') {
+        b.style.opacity='0.25'; b.style.pointerEvents='none';
+      } else if (b.dataset.meal === 'Lunch') {
+        b.style.opacity = lunchAvail ? '1' : '0.25';
+        b.style.pointerEvents = lunchAvail ? 'auto' : 'none';
+      } else if (b.dataset.meal === 'Dinner') {
+        b.style.opacity = dinnerAvail ? '1' : '0.25';
+        b.style.pointerEvents = dinnerAvail ? 'auto' : 'none';
+      }
+    });
+
+    // Correct selectedMeal if current selection is unavailable
+    if (selectedMeal === 'Breakfast' || (selectedMeal === 'Lunch' && !lunchAvail) || (selectedMeal === 'Dinner' && !dinnerAvail)) {
+      if (lunchAvail) { selectedMeal = 'Lunch'; }
+      else if (dinnerAvail) { selectedMeal = 'Dinner'; }
+      else { selectedMeal = 'Lunch'; } // Saturday — both unavailable, just set to lunch as placeholder
+      mealBtns.forEach(b => b.classList.remove('active'));
+      const target = document.querySelector('[data-meal="' + selectedMeal + '"]');
+      if (target) target.classList.add('active');
+    }
   } else {
-    // HH: full UI
+    // HH: full UI, all meals and stations available
     if (stationGroup) stationGroup.style.display = 'flex';
     stationGrid.style.opacity = '1';
     stationGrid.style.pointerEvents = 'auto';
@@ -1463,23 +1492,57 @@ async function acceptCustomItem() {
   const badge = document.getElementById('publishBadge');
   badge.textContent = acceptedItems.length; badge.classList.add('show');
 
-  addToMenuPanelDirect(name, desc, station);
-  const bohId = `boh-${Date.now()}`;
-  addBOHLoading(name, bohId);
+  const ids = addToMenuPanelDirect(name, desc, station);
+  addBOHLoading(name, ids.bohId);
   const bohData = await generateBOH(name, desc, station, location);
-  renderBOH(bohId, name, bohData);
+  renderBOH(ids.bohId, name, bohData);
   populateKpiFromAccepted();
 }
 function addToMenuPanelDirect(name, desc, station) {
   const out = document.getElementById('menuOutput');
   if (out.querySelector('.empty-output')) out.innerHTML='';
-  const c = document.createElement('div'); c.className='menu-card-item';
-  c.innerHTML=`
-    <button class="mci-remove" onclick="this.closest('.menu-card-item').remove()">×</button>
+  const itemId = 'mci-' + Date.now();
+  const bohId = 'boh-' + itemId;
+  const el = document.createElement('div');
+  el.className='menu-card-item'; el.id=itemId; el.dataset.name=name;
+  el.innerHTML=`
+    <button class="mci-remove" onclick="removeItem('${itemId}','${bohId}','${name.replace(/'/g,\"\'\")}')" title="Remove">×</button>
     <div class="mci-station">${selectedMeal} · ${station}</div>
     <div class="mci-name">${name}</div>
     <div class="mci-desc">${desc}</div>`;
-  out.appendChild(c);
+  out.appendChild(el);
+  return { itemId, bohId };
+}
+
+function removeItem(itemId, bohId, name) {
+  // Remove from Build tab panels
+  document.getElementById(itemId)?.remove();
+  document.getElementById(bohId)?.remove();
+  // Remove from acceptedItems array
+  acceptedItems = acceptedItems.filter(i => i.name !== name);
+  acceptedCount = Math.max(0, acceptedCount - 1);
+  document.getElementById('acceptedCount').textContent =
+    acceptedCount + ' item' + (acceptedCount!==1?'s':'') + ' accepted';
+  const badge = document.getElementById('publishBadge');
+  badge.textContent = acceptedItems.length;
+  if (!acceptedItems.length) badge.classList.remove('show');
+  // Remove from KPI dishes — just rebuild from acceptedItems
+  populateKpiFromAccepted();
+  // Remove from publish pubData
+  const pd = getPubData();
+  Object.keys(pd).forEach(dayIdx => {
+    if (!pd[dayIdx]) return;
+    Object.keys(pd[dayIdx]).forEach(key => {
+      if (pd[dayIdx][key]?.name === name) delete pd[dayIdx][key];
+    });
+  });
+  renderMenuCard();
+  if (currentChef) saveCurrentSession();
+  // Restore empty states if nothing left
+  if (!document.querySelectorAll('.menu-card-item').length)
+    document.getElementById('menuOutput').innerHTML = '<div class="empty-output">Accepted items<br>appear here</div>';
+  if (!document.querySelectorAll('.boh-card').length)
+    document.getElementById('bohOutput').innerHTML = '<div class="empty-output">Prep notes<br>appear here</div>';
 }
 
 async function acceptItem(i) {
@@ -1499,22 +1562,22 @@ async function acceptItem(i) {
   const badge = document.getElementById('publishBadge');
   badge.textContent = acceptedItems.length; badge.classList.add('show');
 
-  addToMenuPanel(name, desc, station);
-  const bohId = `boh-${Date.now()}`;
-  addBOHLoading(name, bohId);
+  const ids = addToMenuPanel(name, desc, station);
+  addBOHLoading(name, ids.bohId);
   const bohData = await generateBOH(name, desc, station, location);
-  renderBOH(bohId, name, bohData);
+  renderBOH(ids.bohId, name, bohData);
   populateKpiFromAccepted();
 }
 
 function addToMenuPanel(name, desc, station) {
-  addToMenuPanelDirect(name, desc, station);
+  return addToMenuPanelDirect(name, desc, station);
 }
 
 function addBOHLoading(name, id) {
   const out = document.getElementById('bohOutput');
   if (out.querySelector('.empty-output')) out.innerHTML='';
   const el = document.createElement('div'); el.id=id; el.className='boh-card';
+  el.dataset.station = selectedStation || 'Homestyle';
   el.innerHTML=`<div class="boh-card-name">🔪 ${name}</div><div class="boh-loading"><div class="boh-spinner"></div>Generating prep notes…</div>`;
   out.appendChild(el);
 }
@@ -1522,6 +1585,18 @@ function addBOHLoading(name, id) {
 function renderBOH(id, name, d) {
   const el = document.getElementById(id); if(!el) return;
   const size = getServingSize();
+  const loc = document.getElementById('masterLocation').value;
+  const station = el.dataset.station || selectedStation || 'Homestyle';
+  if (d.error) {
+    el.innerHTML=`
+      <div class="boh-card-name">🔪 ${name}</div>
+      <div style="font-family:'DM Mono',monospace;font-size:0.6rem;color:#E07050;margin:6px 0;">Failed to load — API may be busy.</div>
+      <button onclick="retryBOH('${id.replace(/'/g,"\'")}','${name.replace(/'/g,"\'")}','${station.replace(/'/g,"\'")}','${loc.replace(/'/g,"\'")}',this)"
+        style="background:var(--sage);color:#fff;border:none;padding:6px 12px;font-family:'DM Mono',monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;border-radius:3px;cursor:pointer;">
+        ↺ Retry
+      </button>`;
+    return;
+  }
   el.innerHTML=`
     <div class="boh-card-name">🔪 ${name}</div>
     <div class="boh-sec">Ingredients (~${size} servings)</div>
@@ -1530,6 +1605,15 @@ function renderBOH(id, name, d) {
     <ol class="boh-steps">${(d.steps||[]).map(s=>`<li>${s}</li>`).join('')}</ol>
     ${d.timing?`<div class="boh-sec">Key Timing</div><div class="boh-timing">${d.timing}</div>`:''}
     ${(d.mistakes||[]).length?`<div class="boh-sec">Watch Out For</div><ul class="boh-list">${d.mistakes.map(m=>`<li>⚠ ${m}</li>`).join('')}</ul>`:''}`;
+}
+
+async function retryBOH(id, name, station, loc, btn) {
+  btn.textContent = '↺ Retrying…'; btn.disabled = true;
+  const el = document.getElementById(id); if(!el) return;
+  el.innerHTML=`<div class="boh-card-name">🔪 ${name}</div><div class="boh-loading"><div class="boh-spinner"></div>Retrying…</div>`;
+  const d = await generateBOH(name, '', station, loc);
+  el.dataset.station = station;
+  renderBOH(id, name, d);
 }
 
 async function generateBOH(name, desc, station, loc) {
@@ -1547,7 +1631,7 @@ Requirements: 6-10 ingredients with realistic quantities for ${size} servings ·
     });
     const data = await res.json();
     return JSON.parse(data.content.map(b=>b.text||'').join('').replace(/```json|```/g,'').trim());
-  } catch(e) { return {ingredients:['Error — retry'],steps:['Error — retry'],timing:'',mistakes:[]}; }
+  } catch(e) { return {error:true, ingredients:[],steps:[],timing:'',mistakes:[]}; }
 }
 
 // ═══════════════════════════
@@ -2001,8 +2085,17 @@ function getServingSize() {
   return parseFloat(document.getElementById('asmDinner')?.value)||220;
 }
 
-// kpiDishes: array of { id, name, desc, meal, station, date, costPerServing, protein, carbs, fat }
+// manualKpiValues: persists cost/macro data entered by chef, keyed by dish name
+// survives location switches so values don't have to be re-entered if a dish recurs
+let manualKpiValues = {}; // { [dishName]: { costPerServing, protein, carbs, fat } }
+
+// kpiDishes: derived view — only current location's accepted items this session
+// rebuilt fresh from acceptedItems on every populateKpiFromAccepted() call
 let kpiDishes = [];
+
+function getKpiLocation() {
+  return document.getElementById('masterLocation')?.value || 'Hendrick House';
+}
 
 function updateKpiLocation() {
   const loc = document.getElementById('masterLocation')?.value || '';
@@ -2012,20 +2105,43 @@ function updateKpiLocation() {
   if (isGreek) {
     document.getElementById('greekAssumptionTitle').textContent = `${loc} Headcount`;
   }
-  renderKpiDishList();
+  // Rebuild kpiDishes for new location
+  populateKpiFromAccepted();
 }
 
 function populateKpiFromAccepted() {
-  // Merge accepted items into kpiDishes, preserving any manually entered values
-  acceptedItems.forEach(item => {
-    const id = `${item.date}_${item.meal}_${item.station}_${item.name}`;
-    if (!kpiDishes.find(d => d.id===id)) {
-      kpiDishes.push({ id, name:item.name, desc:item.desc, meal:item.meal, station:item.station, date:item.date, costPerServing:'', protein:'', carbs:'', fat:'' });
-    }
-  });
+  const loc = getKpiLocation();
+  // Rebuild from scratch — only this location's accepted items
+  kpiDishes = acceptedItems
+    .filter(item => item.location === loc)
+    .map(item => {
+      const id = `${item.date}_${item.meal}_${item.station}_${item.name}`;
+      // Restore any manually entered values for this dish name
+      const manual = manualKpiValues[item.name] || {};
+      return {
+        id,
+        name: item.name,
+        desc: item.desc,
+        meal: item.meal,
+        station: item.station,
+        date: item.date,
+        costPerServing: manual.costPerServing || '',
+        protein: manual.protein || '',
+        carbs: manual.carbs || '',
+        fat: manual.fat || ''
+      };
+    });
+
   const badge = document.getElementById('kpiBadge');
-  badge.textContent = kpiDishes.length; badge.classList.add('show');
-  document.getElementById('kpiImportNotice').innerHTML = `<strong>${kpiDishes.length} dish${kpiDishes.length!==1?'es':''}</strong> ready to analyze. Enter cost & macro data below, or click Analyze to auto-estimate.`;
+  if (kpiDishes.length) {
+    badge.textContent = kpiDishes.length; badge.classList.add('show');
+    document.getElementById('kpiImportNotice').innerHTML =
+      `<strong>${kpiDishes.length} dish${kpiDishes.length!==1?'es':''}</strong> from ${loc} this session. Enter values or click Analyze to auto-estimate.`;
+  } else {
+    badge.textContent = '0'; badge.classList.remove('show');
+    document.getElementById('kpiImportNotice').innerHTML =
+      `No dishes for <strong>${loc}</strong> yet.<br>Accept dishes in the Build tab first.`;
+  }
   renderKpiDishList();
 }
 
@@ -2040,13 +2156,18 @@ function renderKpiDishList() {
       <div class="kpi-dish-name">${dish.name}</div>
       <div class="kpi-dish-meta">${dish.meal} · ${dish.station}${dateStr?' · '+dateStr:''}</div>
       <div class="kpi-dish-inputs">
-        <div class="kpi-dish-field"><label>Cost / serving ($)</label><input type="number" step="0.01" min="0" placeholder="e.g. 2.40" value="${dish.costPerServing}" oninput="kpiDishes[${i}].costPerServing=this.value"></div>
-        <div class="kpi-dish-field"><label>Protein (g)</label><input type="number" step="1" min="0" placeholder="g" value="${dish.protein}" oninput="kpiDishes[${i}].protein=this.value"></div>
-        <div class="kpi-dish-field"><label>Carbs (g)</label><input type="number" step="1" min="0" placeholder="g" value="${dish.carbs}" oninput="kpiDishes[${i}].carbs=this.value"></div>
-        <div class="kpi-dish-field"><label>Fat (g)</label><input type="number" step="1" min="0" placeholder="g" value="${dish.fat}" oninput="kpiDishes[${i}].fat=this.value"></div>
+        <div class="kpi-dish-field"><label>Cost / serving ($)</label><input type="number" step="0.01" min="0" placeholder="e.g. 2.40" value="${dish.costPerServing}" oninput="saveManualkpi('${dish.name}','costPerServing',this.value);kpiDishes[${i}].costPerServing=this.value"></div>
+        <div class="kpi-dish-field"><label>Protein (g)</label><input type="number" step="1" min="0" placeholder="g" value="${dish.protein}" oninput="saveManualkpi('${dish.name}','protein',this.value);kpiDishes[${i}].protein=this.value"></div>
+        <div class="kpi-dish-field"><label>Carbs (g)</label><input type="number" step="1" min="0" placeholder="g" value="${dish.carbs}" oninput="saveManualkpi('${dish.name}','carbs',this.value);kpiDishes[${i}].carbs=this.value"></div>
+        <div class="kpi-dish-field"><label>Fat (g)</label><input type="number" step="1" min="0" placeholder="g" value="${dish.fat}" oninput="saveManualkpi('${dish.name}','fat',this.value);kpiDishes[${i}].fat=this.value"></div>
       </div>`;
     container.appendChild(row);
   });
+}
+
+function saveManualkpi(dishName, field, value) {
+  if (!manualKpiValues[dishName]) manualKpiValues[dishName] = {};
+  manualKpiValues[dishName][field] = value;
 }
 
 async function runKpiAnalysis() {

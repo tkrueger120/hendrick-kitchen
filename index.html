@@ -363,14 +363,15 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
       <option>Delta Tau</option>
       <option>Phi Delta Theta</option>
     </select>
-    <div style="display:flex;align-items:center;gap:5px;">
+    <div style="display:flex;align-items:center;gap:5px;position:relative;">
       <span style="font-family:'DM Mono',monospace;font-size:0.52rem;letter-spacing:0.1em;text-transform:uppercase;color:#4A4540;">Week</span>
-      <select id="masterWeek" onchange="onMasterWeekChange()"
-        style="background:#2A2520;border:1px solid #3A3530;color:#F7F3EC;padding:5px 10px;font-family:'DM Mono',monospace;font-size:0.72rem;border-radius:4px;outline:none;cursor:pointer;appearance:none;min-width:130px;">
-      </select>
-      <button onclick="addWeek()" title="Add a new week"
-        style="background:#2A2520;border:1px solid #3A3530;color:#C9973A;padding:4px 9px;font-family:'DM Mono',monospace;font-size:0.7rem;border-radius:4px;cursor:pointer;transition:all 0.2s;"
-        onmouseover="this.style.borderColor='#C9973A'" onmouseout="this.style.borderColor='#3A3530'">+ Week</button>
+      <button id="weekPickerBtn" onclick="document.getElementById('weekPickerInput').showPicker ? document.getElementById('weekPickerInput').showPicker() : document.getElementById('weekPickerInput').click()"
+        style="background:#2A2520;border:1px solid #3A3530;color:#F7F3EC;padding:5px 12px;font-family:'DM Mono',monospace;font-size:0.72rem;border-radius:4px;cursor:pointer;transition:border-color 0.2s;min-width:148px;text-align:left;"
+        onmouseover="this.style.borderColor='#C9973A'" onmouseout="this.style.borderColor='#3A3530'">
+        Select week…
+      </button>
+      <input type="week" id="weekPickerInput" onchange="onWeekPickerChange(this.value)"
+        style="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px;top:0;left:0;">
     </div>
     <div class="api-status"><div class="api-dot"></div>API Connected</div>
     <button class="btn-sm" onclick="changeKey()">Change Key</button>
@@ -381,8 +382,9 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
 <div class="tab-content active" id="tabBuild">
   <div class="build-left">
     <div class="field-group">
-      <div class="panel-label">Date</div>
-      <input type="date" class="dk-input" id="menuDate">
+      <div class="panel-label">Day</div>
+      <div id="dayButtonRow" style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;"></div>
+      <input type="hidden" id="menuDate" value="">
     </div>
 
     <div class="field-group">
@@ -1038,7 +1040,28 @@ function syncAcceptedFromStaged() {
   if (acceptedCount > 0) badge.classList.add('show');
   else badge.classList.remove('show');
   rebuildBuildPanel();
+  rebuildBOHPanel();
   populateKpiFromAccepted();
+}
+
+function rebuildBOHPanel() {
+  const out = document.getElementById('bohOutput');
+  if (!out) return;
+  const items = getStagedItems();
+  if (!items.length) {
+    out.innerHTML = '<div class="empty-output">Prep notes<br>appear here</div>';
+    return;
+  }
+  // Keep existing BOH cards that match current staged items; remove orphans
+  const stagedNames = new Set(items.map(i => i.name));
+  out.querySelectorAll('.boh-card').forEach(card => {
+    if (!stagedNames.has(card.dataset.name)) card.remove();
+  });
+  // BOH cards that are already rendered stay — only missing ones need noting
+  // (We don't re-generate BOH on week switch — chef can retry manually)
+  if (!out.querySelectorAll('.boh-card').length) {
+    out.innerHTML = '<div class="empty-output">Prep notes<br>appear here</div>';
+  }
 }
 
 function rebuildBuildPanel() {
@@ -1283,47 +1306,62 @@ function addWeek(dateStr) {
 }
 
 function renderWeekSelector() {
-  const sel = document.getElementById('masterWeek');
-  if (!sel) return;
-  const current = getWeekKey();
-  sel.innerHTML = '';
-  availableWeeks.forEach(wk => {
-    const opt = document.createElement('option');
-    opt.value = wk;
-    opt.textContent = weekLabel(wk);
-    if (wk === current) opt.selected = true;
-    sel.appendChild(opt);
-  });
+  const btn = document.getElementById('weekPickerBtn');
+  if (!btn) return;
+  const wk = getWeekKey();
+  btn.textContent = wk ? weekLabel(wk) : 'Select week…';
+  // Also sync the week input value
+  if (wk) {
+    // Convert YYYY-MM-DD Monday to YYYY-W## format for input[type=week]
+    const d = new Date(wk+'T00:00:00');
+    const jan4 = new Date(d.getFullYear(),0,4);
+    const weekNum = Math.ceil(((d-jan4)/86400000 + jan4.getDay()+1)/7);
+    document.getElementById('weekPickerInput').value =
+      d.getFullYear()+'-W'+(weekNum<10?'0':'')+weekNum;
+  }
+  renderDayButtons();
 }
 
 function setCurrentWeek(wk) {
   currentWeekKey = wk;
-  // Sync pub week start date display
+  // Sync hidden pubWeekStart for any legacy references
   const pubWS = document.getElementById('pubWeekStart');
   if (pubWS) pubWS.value = wk;
-  // Sync build tab date to Monday of this week if currently outside range
+  // Set menuDate hidden input to Monday of this week
   const menuDate = document.getElementById('menuDate');
-  if (menuDate && menuDate.value) {
-    const curMon = mondayOf(menuDate.value);
-    if (curMon !== wk) menuDate.value = wk;
-  } else if (menuDate) {
-    menuDate.value = wk;
-  }
+  if (menuDate) menuDate.value = wk;
+  // Clear BOH panel — will be rebuilt by syncAcceptedFromStaged
+  document.getElementById('bohOutput').innerHTML =
+    '<div class="empty-output">Prep notes<br>appear here</div>';
+  // Clear suggestions
+  document.getElementById('suggestionsGrid').innerHTML =
+    '<div class="empty-state"><div class="empty-icon">&#127869;</div><div class="empty-label">Configure and generate options</div></div>';
   // Reload staged items for this week
   syncAcceptedFromStaged();
-  // Re-render publish card
+  // Re-render publish card and week button label
   renderMenuCard();
+  renderWeekSelector();
   updateContextPill();
 }
 
-function onMasterWeekChange() {
+function onWeekPickerChange(weekValue) {
+  // weekValue is like "2026-W14" — convert to Monday YYYY-MM-DD
+  if (!weekValue) return;
+  const [yearStr, weekStr] = weekValue.split('-W');
+  const year = parseInt(yearStr);
+  const week = parseInt(weekStr);
+  // ISO week to date: Jan 4 is always in week 1
+  const jan4 = new Date(year, 0, 4);
+  const startOfWeek1 = new Date(jan4);
+  startOfWeek1.setDate(jan4.getDate() - (jan4.getDay() || 7) + 1);
+  const monday = new Date(startOfWeek1);
+  monday.setDate(startOfWeek1.getDate() + (week-1)*7);
+  const monStr = monday.toISOString().split('T')[0];
   if (currentChef) saveCurrentSession();
-  const wk = document.getElementById('masterWeek').value;
-  setCurrentWeek(wk);
+  addWeek(monStr);
 }
 
 function ensureCurrentWeekExists() {
-  // Make sure there's at least one week and currentWeekKey is valid
   if (!availableWeeks.length) {
     const today = new Date();
     const jsDay = today.getDay();
@@ -1334,7 +1372,58 @@ function ensureCurrentWeekExists() {
   if (!currentWeekKey || !availableWeeks.includes(currentWeekKey)) {
     currentWeekKey = availableWeeks[availableWeeks.length - 1];
   }
-  renderWeekSelector();
+}
+
+// Track which day index is selected in the Build tab (0=Mon ... 6=Sun)
+let selectedDayIndex = 0;
+
+function getSelectedDayDate() {
+  // Returns YYYY-MM-DD for the currently selected day button
+  const wk = getWeekKey();
+  if (!wk) return '';
+  const base = new Date(wk+'T00:00:00');
+  base.setDate(base.getDate() + selectedDayIndex);
+  return base.toISOString().split('T')[0];
+}
+
+function renderDayButtons() {
+  const row = document.getElementById('dayButtonRow');
+  if (!row) return;
+  const wk = getWeekKey();
+  row.innerHTML = '';
+  const loc = document.getElementById('masterLocation')?.value || 'Hendrick House';
+  const greek = isGreekHouse(loc);
+  const DAY_LABELS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  // Greek availability: lunchAvail days and dinnerAvail days
+  // For button greying we just check if the day has ANY service
+  // Greek: Mon-Fri have lunch, Mon-Thu+Sun have dinner, Sat has nothing
+  const greekHasService = [true,true,true,true,true,false,true]; // Mon-Sun (Sat=false)
+
+  DAY_LABELS.forEach((label, di) => {
+    const btn = document.createElement('button');
+    btn.className = 'tog-btn' + (di === selectedDayIndex ? ' active' : '');
+    // Show date if week is set
+    let dateStr = '';
+    if (wk) {
+      const d = new Date(wk+'T00:00:00'); d.setDate(d.getDate()+di);
+      dateStr = d.toLocaleDateString('en-US',{month:'numeric',day:'numeric'});
+    }
+    btn.innerHTML = `<div style="font-size:0.65rem;letter-spacing:0.06em;">${label}</div>${dateStr?`<div style="font-size:0.5rem;opacity:0.7;margin-top:1px;">${dateStr}</div>`:''}`;
+    btn.style.padding = '7px 3px';
+    const unavailable = greek && !greekHasService[di];
+    if (unavailable) {
+      btn.style.opacity = '0.25'; btn.style.pointerEvents = 'none';
+    } else {
+      btn.addEventListener('click', () => {
+        selectedDayIndex = di;
+        renderDayButtons();
+        // Also update meal availability for this day
+        updateLocationUI();
+        updateContextPill();
+      });
+    }
+    row.appendChild(btn);
+  });
 }
 
 // ═══════════════════════════
@@ -1348,7 +1437,7 @@ function init() {
   ensureCurrentWeekExists();
   renderWeekSelector();
   const today = new Date();
-  document.getElementById('menuDate').value = today.toISOString().split('T')[0];
+  // menuDate is set by setCurrentWeek via day buttons
   updateContextPill();
   updateLocationUI();
   initPubDays();
@@ -1407,19 +1496,7 @@ document.querySelectorAll('[data-station]').forEach(btn => {
   });
 });
 // (legacy location listener removed)
-document.getElementById('menuDate').addEventListener('change', () => {
-  const dateVal = document.getElementById('menuDate').value;
-  if (dateVal) {
-    const mon = mondayOf(dateVal);
-    // If this date belongs to a different week, switch to it (adding if needed)
-    if (mon !== getWeekKey()) {
-      if (currentChef) saveCurrentSession();
-      addWeek(dateVal);
-    }
-  }
-  updateContextPill();
-  updateLocationUI();
-});
+// menuDate is now a hidden input synced to currentWeekKey
 
 const GREEK_HOUSES = ['Delta Delta Delta','Alpha Phi','Sig Ep','ADPhi','Delta Tau','Phi Delta Theta'];
 
@@ -1441,16 +1518,10 @@ function updateLocationUI() {
     stationGrid.style.pointerEvents = 'none';
     selectedStation = 'Homestyle';
 
-    // Determine which meals are available based on the selected date
-    const dateVal = document.getElementById('menuDate').value;
-    let lunchAvail = true, dinnerAvail = true;
-    if (dateVal) {
-      const jsDay = new Date(dateVal + 'T00:00:00').getDay();
-      // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
-      // Greek schedule: Mon-Thu L+D, Fri L only, Sat none, Sun D only
-      lunchAvail  = [1,2,3,4,5].includes(jsDay); // Mon-Fri
-      dinnerAvail = [0,1,2,3,4].includes(jsDay); // Sun-Thu
-    }
+    // Use selectedDayIndex: 0=Mon,1=Tue,2=Wed,3=Thu,4=Fri,5=Sat,6=Sun
+    // Greek: Mon-Fri lunch (0-4), Mon-Thu+Sun dinner (0-3,6)
+    let lunchAvail  = [0,1,2,3,4].includes(selectedDayIndex);
+    let dinnerAvail = [0,1,2,3,6].includes(selectedDayIndex);
 
     mealBtns.forEach(b => {
       if (b.dataset.meal === 'Breakfast') {
@@ -1468,23 +1539,24 @@ function updateLocationUI() {
     if (selectedMeal === 'Breakfast' || (selectedMeal === 'Lunch' && !lunchAvail) || (selectedMeal === 'Dinner' && !dinnerAvail)) {
       if (lunchAvail) { selectedMeal = 'Lunch'; }
       else if (dinnerAvail) { selectedMeal = 'Dinner'; }
-      else { selectedMeal = 'Lunch'; } // Saturday — both unavailable, just set to lunch as placeholder
+      else { selectedMeal = 'Lunch'; }
       mealBtns.forEach(b => b.classList.remove('active'));
       const target = document.querySelector('[data-meal="' + selectedMeal + '"]');
       if (target) target.classList.add('active');
     }
   } else {
-    // HH: full UI, all meals and stations available
+    // HH: full UI
     if (stationGroup) stationGroup.style.display = 'flex';
     stationGrid.style.opacity = '1';
     stationGrid.style.pointerEvents = 'auto';
     mealBtns.forEach(b => { b.style.opacity='1'; b.style.pointerEvents='auto'; });
   }
+  renderDayButtons();
 }
 
 function updateContextPill() {
   const loc = document.getElementById('masterLocation').value;
-  const date = document.getElementById('menuDate').value;
+  const date = getSelectedDayDate();
   const dateStr = date ? new Date(date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) : '—';
   const greek = isGreekHouse(loc);
   const stationLabel = greek ? 'Single Menu' : (selectedMeal==='Breakfast' ? 'All Stations' : selectedStation);
@@ -1525,7 +1597,7 @@ function getDescStyle(station) {
 async function generateSuggestions() {
   if (!window.API_KEY) { changeKey(); return; }
   const location = document.getElementById('masterLocation').value;
-  const date = document.getElementById('menuDate').value;
+  const date = getSelectedDayDate();
   const theme = document.getElementById('themeInput').value.trim();
   const inventory = document.getElementById('inventoryInput').value.trim();
   const greek = isGreekHouse(location);
@@ -1664,7 +1736,7 @@ async function acceptCustomItem() {
   nameEl.style.borderColor='';
 
   const station = selectedMeal==='Breakfast' ? 'Breakfast' : selectedStation;
-  const date = document.getElementById('menuDate').value;
+  const date = getSelectedDayDate();
   const location = document.getElementById('masterLocation').value;
   let desc = descEl.value.trim();
 
@@ -1760,7 +1832,7 @@ async function acceptItem(i) {
   const name = card.querySelector('.dish-name').textContent;
   const desc = card.querySelector('.dish-desc').textContent;
   const station = selectedMeal==='Breakfast' ? 'Breakfast' : selectedStation;
-  const date = document.getElementById('menuDate').value;
+  const date = getSelectedDayDate();
   const location = document.getElementById('masterLocation').value;
 
   card.classList.add('accepted');
@@ -1902,9 +1974,9 @@ function togglePubDay(i, checked) {
 }
 
 function getWeekDates() {
-  const ws = document.getElementById('pubWeekStart').value;
-  if (!ws) return {};
-  const base = new Date(ws+'T00:00:00');
+  const wk = getWeekKey();
+  if (!wk) return {};
+  const base = new Date(wk+'T00:00:00');
   const map = {};
   pubActiveDays.forEach(di => {
     const d = new Date(base); d.setDate(base.getDate()+di);
@@ -1914,10 +1986,10 @@ function getWeekDates() {
 }
 
 function getWeekRangeLabel() {
-  const ws = document.getElementById('pubWeekStart')?.value;
-  if (!ws) return 'Week of —';
-  const base = new Date(ws+'T00:00:00');
-  const last = pubActiveDays[pubActiveDays.length-1]||0;
+  const wk = getWeekKey();
+  if (!wk) return 'Week of —';
+  const base = new Date(wk+'T00:00:00');
+  const last = pubActiveDays[pubActiveDays.length-1]||6;
   const end = new Date(base); end.setDate(base.getDate()+last);
   return `${base.toLocaleDateString('en-US',{month:'long',day:'numeric'})} – ${end.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'})}`;
 }
@@ -2101,7 +2173,7 @@ function copyMenuText() {
   const cards = document.querySelectorAll('.menu-card-item');
   if (!cards.length) { alert('No items accepted yet.'); return; }
   const loc = document.getElementById('masterLocation').value;
-  const date = document.getElementById('menuDate').value;
+  const date = getSelectedDayDate();
   const dateStr = date ? new Date(date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}) : '';
   let text = `${loc.toUpperCase()}\n${dateStr}\n${'─'.repeat(40)}\n\n`;
   cards.forEach(c => { text+=`${c.querySelector('.mci-station')?.textContent||''}\n${c.querySelector('.mci-name')?.textContent||''}\n${c.querySelector('.mci-desc')?.textContent||''}\n\n`; });
@@ -2124,7 +2196,7 @@ function exportBOHText() {
   });
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([text],{type:'text/plain'}));
-  a.download=`BOH_Notes_${document.getElementById('menuDate').value||'notes'}.txt`;
+  a.download=`BOH_Notes_${getSelectedDayDate()||'notes'}.txt`;
   a.click();
 }
 

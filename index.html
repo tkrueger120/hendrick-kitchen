@@ -363,6 +363,15 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
       <option>Delta Tau</option>
       <option>Phi Delta Theta</option>
     </select>
+    <div style="display:flex;align-items:center;gap:5px;">
+      <span style="font-family:'DM Mono',monospace;font-size:0.52rem;letter-spacing:0.1em;text-transform:uppercase;color:#4A4540;">Week</span>
+      <select id="masterWeek" onchange="onMasterWeekChange()"
+        style="background:#2A2520;border:1px solid #3A3530;color:#F7F3EC;padding:5px 10px;font-family:'DM Mono',monospace;font-size:0.72rem;border-radius:4px;outline:none;cursor:pointer;appearance:none;min-width:130px;">
+      </select>
+      <button onclick="addWeek()" title="Add a new week"
+        style="background:#2A2520;border:1px solid #3A3530;color:#C9973A;padding:4px 9px;font-family:'DM Mono',monospace;font-size:0.7rem;border-radius:4px;cursor:pointer;transition:all 0.2s;"
+        onmouseover="this.style.borderColor='#C9973A'" onmouseout="this.style.borderColor='#3A3530'">+ Week</button>
+    </div>
     <div class="api-status"><div class="api-dot"></div>API Connected</div>
     <button class="btn-sm" onclick="changeKey()">Change Key</button>
   </div>
@@ -441,10 +450,7 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
   <div class="pub-left">
 <input type="hidden" id="pubLocation" value="Hendrick House">
 <input type="hidden" id="locationSelect" value="Hendrick House">
-    <div class="field-group">
-      <div class="panel-label">Week Starting (Monday)</div>
-      <input type="date" class="dk-input" id="pubWeekStart" onchange="renderMenuCard()">
-    </div>
+<input type="hidden" id="pubWeekStart" value="">
     <div>
       <div class="panel-label">Days to Show</div>
       <div class="pub-day-list" id="pubDayList"></div>
@@ -948,25 +954,119 @@ loadStyleSettings();
 // ═══════════════════════════
 // CONSTANTS & STATE
 // ═══════════════════════════
+const STORAGE_VERSION = 3;
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 const STATIONS = ['Homestyle','Sizzle','Veggie Life','Pizza'];
-// Row keys: breakfast, then lunch_X, then dinner_X
-// pubData[dayIdx][rowKey] = { name, desc }
-// rowKey: 'breakfast' | 'lunch_Homestyle' | 'lunch_Sizzle' | etc.
 
-let API_KEY = '';
+// ── Unified Claude API call ──
+async function callClaude(prompt, maxTokens=1000) {
+  if (!window.API_KEY) throw new Error('No API key');
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': window.API_KEY,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: maxTokens,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+  if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || `HTTP ${res.status}`); }
+  const data = await res.json();
+  return data.content.map(b => b.text || '').join('').replace(/```json|```/g, '').trim();
+}
+
 let selectedMeal = 'Breakfast';
 let selectedStation = 'Homestyle';
-let acceptedCount = 0;
-let acceptedItems = []; // { date, meal, station, name, desc, location }
-let pubActiveDays = [0,1,2,3,4]; // Mon–Fri default
-// allPubData[location][dayIdx][rowKey] = { name, desc }
+
+// ── Per location+week staged items (Build tab) ──
+// stagedItems[loc][weekKey] = [{ date, meal, station, name, desc, location }]
+let stagedItems = {};
+
+// ── Available weeks list ──
+let availableWeeks = []; // array of 'YYYY-MM-DD' Monday dates
+
+// ── Current week key ──
+let currentWeekKey = '';
+
+// ── Published data: allPubData[loc][weekKey][dayIdx][rowKey] = { name, desc } ──
 let allPubData = {};
 
+// ── Pub display settings per week ──
+let pubActiveDays = [0,1,2,3,4]; // Mon-Fri default
+
+function getWeekKey() {
+  return currentWeekKey || availableWeeks[0] || '';
+}
+
+function getLoc() {
+  return document.getElementById('masterLocation')?.value || 'Hendrick House';
+}
+
 function getPubData() {
-  const loc = document.getElementById('masterLocation').value || 'Hendrick House';
+  const loc = getLoc();
+  const wk = getWeekKey();
   if (!allPubData[loc]) allPubData[loc] = {};
-  return allPubData[loc];
+  if (!allPubData[loc][wk]) allPubData[loc][wk] = {};
+  return allPubData[loc][wk];
+}
+
+function getStagedItems() {
+  const loc = getLoc();
+  const wk = getWeekKey();
+  if (!stagedItems[loc]) stagedItems[loc] = {};
+  if (!stagedItems[loc][wk]) stagedItems[loc][wk] = [];
+  return stagedItems[loc][wk];
+}
+
+// acceptedItems is now a live view of getStagedItems()
+// kept as a variable for compatibility but always synced
+let acceptedItems = [];
+let acceptedCount = 0;
+
+function syncAcceptedFromStaged() {
+  acceptedItems = getStagedItems();
+  acceptedCount = acceptedItems.length;
+  document.getElementById('acceptedCount').textContent =
+    acceptedCount + ' item' + (acceptedCount !== 1 ? 's' : '') + ' accepted';
+  const badge = document.getElementById('publishBadge');
+  badge.textContent = acceptedCount;
+  if (acceptedCount > 0) badge.classList.add('show');
+  else badge.classList.remove('show');
+  rebuildBuildPanel();
+  populateKpiFromAccepted();
+}
+
+function rebuildBuildPanel() {
+  // Rebuild the public menu panel from staged items
+  const out = document.getElementById('menuOutput');
+  out.innerHTML = '';
+  const items = getStagedItems();
+  if (!items.length) {
+    out.innerHTML = '<div class="empty-output">Accepted items<br>appear here</div>';
+    return;
+  }
+  items.forEach(item => {
+    const itemId = item._itemId || ('mci-' + item.name.replace(/\s/g,''));
+    const bohId = item._bohId || ('boh-' + itemId);
+    item._itemId = itemId; item._bohId = bohId;
+    const el = document.createElement('div');
+    el.className = 'menu-card-item'; el.id = itemId; el.dataset.name = item.name;
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'mci-remove'; removeBtn.title = 'Remove'; removeBtn.textContent = '×';
+    removeBtn.addEventListener('click', function() {
+      removeItem(itemId, bohId, el.dataset.name);
+    });
+    const stationDiv = document.createElement('div'); stationDiv.className='mci-station'; stationDiv.textContent=item.meal+' · '+item.station;
+    const nameDiv = document.createElement('div'); nameDiv.className='mci-name'; nameDiv.textContent=item.name;
+    const descDiv = document.createElement('div'); descDiv.className='mci-desc'; descDiv.textContent=item.desc;
+    el.appendChild(removeBtn); el.appendChild(stationDiv); el.appendChild(nameDiv); el.appendChild(descDiv);
+    out.appendChild(el);
+  });
 }
 
 function rowKey(meal, station) {
@@ -984,6 +1084,15 @@ function setPubCell(dayIdx, meal, station, name, desc) {
   if (!pd[dayIdx]) pd[dayIdx] = {};
   const key = rowKey(meal, station);
   pd[dayIdx][key] = { name, desc };
+}
+
+function deletePubCell(dayIdx, meal, station) {
+  const pd = getPubData();
+  if (!pd[dayIdx]) return;
+  const key = rowKey(meal, station);
+  delete pd[dayIdx][key];
+  renderMenuCard();
+  if (currentChef) saveCurrentSession();
 }
 
 // ═══════════════════════════
@@ -1058,11 +1167,14 @@ function switchChef() {
 function saveCurrentSession() {
   if (!currentChef) return;
   const data = getChefData(currentChef);
+  data.version = STORAGE_VERSION;
   data.lastSaved = new Date().toISOString();
   data.pubData = allPubData;
+  data.stagedItems = stagedItems;
+  data.availableWeeks = availableWeeks;
+  data.currentWeekKey = currentWeekKey;
   data.pubActiveDays = pubActiveDays;
-  data.pubWeekStart = document.getElementById('pubWeekStart').value;
-  data.masterLocation = document.getElementById('masterLocation').value;
+  data.masterLocation = getLoc();
   data.styleSettings = styleSettings;
   data.manualKpiValues = manualKpiValues;
   data.weeklyBudget = document.getElementById('weeklyBudget')?.value||'';
@@ -1072,19 +1184,40 @@ function saveCurrentSession() {
 
 function loadChefSession(name) {
   const data = getChefData(name);
+  // Version check — if data is from an old schema, start fresh
+  if (data.version && data.version < STORAGE_VERSION) {
+    console.log('Old data version detected, starting fresh for', name);
+    // Keep style settings and manual kpi values but reset data structures
+    if (data.styleSettings) styleSettings = data.styleSettings;
+    if (data.manualKpiValues) manualKpiValues = data.manualKpiValues;
+    ensureCurrentWeekExists();
+    renderWeekSelector();
+    initPubDays();
+    renderMenuCard();
+    loadStyleSettings();
+    return;
+  }
   if (data.pubData) {
     allPubData = data.pubData;
+    // Convert numeric string keys back to integers
     Object.keys(allPubData).forEach(loc => {
-      const converted = {};
-      Object.entries(allPubData[loc]).forEach(([k,v]) => { converted[parseInt(k)] = v; });
-      allPubData[loc] = converted;
+      Object.keys(allPubData[loc]).forEach(wk => {
+        const converted = {};
+        Object.entries(allPubData[loc][wk]).forEach(([k,v]) => { converted[parseInt(k)] = v; });
+        allPubData[loc][wk] = converted;
+      });
     });
   }
+  if (data.stagedItems) stagedItems = data.stagedItems;
+  if (data.availableWeeks && data.availableWeeks.length) {
+    availableWeeks = data.availableWeeks;
+    currentWeekKey = data.currentWeekKey || availableWeeks[availableWeeks.length-1];
+  } else {
+    ensureCurrentWeekExists();
+  }
   if (data.pubActiveDays) pubActiveDays = data.pubActiveDays;
-  if (data.pubWeekStart) document.getElementById('pubWeekStart').value = data.pubWeekStart;
   if (data.masterLocation) {
     document.getElementById('masterLocation').value = data.masterLocation;
-    // Sync all hidden inputs
     ['locationSelect','pubLocation','kpiLocation','styleLocation'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.value = data.masterLocation;
@@ -1101,7 +1234,8 @@ function loadChefSession(name) {
   if (data.maxPremium && document.getElementById('maxPremium')) {
     document.getElementById('maxPremium').value = data.maxPremium;
   }
-  // Re-render
+  renderWeekSelector();
+  syncAcceptedFromStaged();
   const container = document.getElementById('pubDayList');
   container.innerHTML = '';
   initPubDays();
@@ -1109,9 +1243,99 @@ function loadChefSession(name) {
   loadStyleSettings();
 }
 
-// Auto-save when Send to Publish is clicked (already happens via sendToPublish)
-// Also auto-save every 60 seconds if a chef is logged in
+// Auto-save every 60 seconds
 setInterval(() => { if (currentChef) saveCurrentSession(); }, 60000);
+
+// ══════════════════════════════════════════════
+// WEEK MANAGEMENT
+// ══════════════════════════════════════════════
+
+function mondayOf(dateStr) {
+  // Given any date string, return the Monday of that week as YYYY-MM-DD
+  const d = new Date(dateStr + 'T00:00:00');
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d.toISOString().split('T')[0];
+}
+
+function weekLabel(mondayStr) {
+  const d = new Date(mondayStr + 'T00:00:00');
+  return 'Week of ' + d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+}
+
+function addWeek(dateStr) {
+  // Add a week to availableWeeks. If no date given, prompt for one or use next Monday
+  if (!dateStr) {
+    const today = new Date();
+    const jsDay = today.getDay();
+    const daysToMon = jsDay === 0 ? 1 : 8 - jsDay;
+    const nextMon = new Date(today); nextMon.setDate(today.getDate() + daysToMon);
+    dateStr = nextMon.toISOString().split('T')[0];
+  }
+  const mon = mondayOf(dateStr);
+  if (!availableWeeks.includes(mon)) {
+    availableWeeks.push(mon);
+    availableWeeks.sort();
+  }
+  renderWeekSelector();
+  setCurrentWeek(mon);
+}
+
+function renderWeekSelector() {
+  const sel = document.getElementById('masterWeek');
+  if (!sel) return;
+  const current = getWeekKey();
+  sel.innerHTML = '';
+  availableWeeks.forEach(wk => {
+    const opt = document.createElement('option');
+    opt.value = wk;
+    opt.textContent = weekLabel(wk);
+    if (wk === current) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function setCurrentWeek(wk) {
+  currentWeekKey = wk;
+  // Sync pub week start date display
+  const pubWS = document.getElementById('pubWeekStart');
+  if (pubWS) pubWS.value = wk;
+  // Sync build tab date to Monday of this week if currently outside range
+  const menuDate = document.getElementById('menuDate');
+  if (menuDate && menuDate.value) {
+    const curMon = mondayOf(menuDate.value);
+    if (curMon !== wk) menuDate.value = wk;
+  } else if (menuDate) {
+    menuDate.value = wk;
+  }
+  // Reload staged items for this week
+  syncAcceptedFromStaged();
+  // Re-render publish card
+  renderMenuCard();
+  updateContextPill();
+}
+
+function onMasterWeekChange() {
+  if (currentChef) saveCurrentSession();
+  const wk = document.getElementById('masterWeek').value;
+  setCurrentWeek(wk);
+}
+
+function ensureCurrentWeekExists() {
+  // Make sure there's at least one week and currentWeekKey is valid
+  if (!availableWeeks.length) {
+    const today = new Date();
+    const jsDay = today.getDay();
+    const daysToMon = jsDay === 0 ? 1 : 8 - jsDay;
+    const nextMon = new Date(today); nextMon.setDate(today.getDate() + daysToMon);
+    availableWeeks = [nextMon.toISOString().split('T')[0]];
+  }
+  if (!currentWeekKey || !availableWeeks.includes(currentWeekKey)) {
+    currentWeekKey = availableWeeks[availableWeeks.length - 1];
+  }
+  renderWeekSelector();
+}
 
 // ═══════════════════════════
 // API KEY & INIT
@@ -1121,18 +1345,14 @@ function init() {
     const stored = localStorage.getItem('hh_chef_api_key');
     if (stored) { window.API_KEY = stored; document.getElementById('apiKeyScreen').style.display = 'none'; }
   } catch(e) {}
+  ensureCurrentWeekExists();
+  renderWeekSelector();
   const today = new Date();
   document.getElementById('menuDate').value = today.toISOString().split('T')[0];
-  const jsDay = today.getDay();
-  const daysToMon = jsDay === 0 ? 1 : 8 - jsDay;
-  const nextMon = new Date(today); nextMon.setDate(today.getDate() + daysToMon);
-  document.getElementById('pubWeekStart').value = nextMon.toISOString().split('T')[0];
   updateContextPill();
   updateLocationUI();
   initPubDays();
   renderMenuCard();
-  // Show chef profile screen after API key is confirmed
-  // We defer so API key screen shows first if needed
   setTimeout(() => {
     if (document.getElementById('apiKeyScreen').style.display === 'none') {
       showChefProfileScreen();
@@ -1186,21 +1406,19 @@ document.querySelectorAll('[data-station]').forEach(btn => {
     btn.classList.add('active'); selectedStation=btn.dataset.station; updateContextPill();
   });
 });
-document.getElementById('masterLocationLegacy_DISABLED', () => {
-  acceptedItems = [];
-  acceptedCount = 0;
-  document.getElementById('acceptedCount').textContent = '0 items accepted';
-  document.getElementById('menuOutput').innerHTML = '<div class="empty-output">Accepted items<br>appear here</div>';
-  document.getElementById('bohOutput').innerHTML = '<div class="empty-output">Prep notes<br>appear here</div>';
-  document.getElementById('suggestionsGrid').innerHTML = '<div class="empty-state"><div class="empty-icon">&#127869;</div><div class="empty-label">Configure and generate options</div></div>';
-  const pb = document.getElementById('publishBadge');
-  pb.textContent = '0'; pb.classList.remove('show');
-  updateLocationUI();
-  updateContextPill();
-});
+// (legacy location listener removed)
 document.getElementById('menuDate').addEventListener('change', () => {
+  const dateVal = document.getElementById('menuDate').value;
+  if (dateVal) {
+    const mon = mondayOf(dateVal);
+    // If this date belongs to a different week, switch to it (adding if needed)
+    if (mon !== getWeekKey()) {
+      if (currentChef) saveCurrentSession();
+      addWeek(dateVal);
+    }
+  }
   updateContextPill();
-  updateLocationUI(); // re-evaluate which meals are available for this day
+  updateLocationUI();
 });
 
 const GREEK_HOUSES = ['Delta Delta Delta','Alpha Phi','Sig Ep','ADPhi','Delta Tau','Phi Delta Theta'];
@@ -1275,31 +1493,22 @@ function updateContextPill() {
 }
 
 function onMasterLocationChange() {
+  if (currentChef) saveCurrentSession();
   const loc = document.getElementById('masterLocation').value;
-  // Sync all hidden location inputs
   ['locationSelect','pubLocation','kpiLocation','styleLocation'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = loc;
   });
-  // Clear build tab
-  acceptedItems = [];
-  acceptedCount = 0;
-  document.getElementById('acceptedCount').textContent = '0 items accepted';
-  document.getElementById('menuOutput').innerHTML = '<div class="empty-output">Accepted items<br>appear here</div>';
-  document.getElementById('bohOutput').innerHTML = '<div class="empty-output">Prep notes<br>appear here</div>';
+  // Clear suggestions pane and inventory (per-location)
   document.getElementById('suggestionsGrid').innerHTML = '<div class="empty-state"><div class="empty-icon">&#127869;</div><div class="empty-label">Configure and generate options</div></div>';
-  const pb = document.getElementById('publishBadge');
-  pb.textContent = '0'; pb.classList.remove('show');
-  // Clear inventory
   document.getElementById('inventoryInput').value = '';
-  // Update UI for location type
+  document.getElementById('bohOutput').innerHTML = '<div class="empty-output">Prep notes<br>appear here</div>';
+  // Load staged items for this location+week
+  syncAcceptedFromStaged();
   updateLocationUI();
   updateContextPill();
-  // Update publish card
   renderMenuCard();
-  // Update style tab
   loadStyleSettings();
-  // Update KPI
   updateKpiLocation();
 }
 
@@ -1409,14 +1618,8 @@ Respond ONLY with valid JSON:
 {"options":[{"name":"","desc":"","vegAlt":null},{"name":"","desc":"","vegAlt":null},{"name":"","desc":"","vegAlt":null}]}`;
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':window.API_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1200,messages:[{role:'user',content:prompt}]})
-    });
-    if (!res.ok) { const e=await res.json(); throw new Error(e.error?.message||`HTTP ${res.status}`); }
-    const data = await res.json();
-    const parsed = JSON.parse(data.content.map(b=>b.text||'').join('').replace(/```json|```/g,'').trim());
+    const text = await callClaude(prompt, 1200);
+    const parsed = JSON.parse(text);
     renderSuggestions(parsed.options, station);
   } catch(err) {
     grid.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-label">Error: ${err.message}</div></div>`;
@@ -1474,23 +1677,20 @@ async function acceptCustomItem() {
   if (!desc) {
     card.querySelector('.btn-custom-accept').textContent = 'Generating description…';
     try {
-      const prompt = `Write a single public-facing menu description for this dish: "${name}". Station: ${station}. ${getDescStyle(station)} Respond with ONLY the description text, nothing else.`;
-      const res = await fetch('https://api.anthropic.com/v1/messages',{
-        method:'POST',
-        headers:{'Content-Type':'application/json','x-api-key':window.API_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:120,messages:[{role:'user',content:prompt}]})
-      });
-      const data = await res.json();
-      desc = data.content.map(b=>b.text||'').join('').trim();
+      const descPrompt = `Write a single public-facing menu description for this dish: "${name}". Station: ${station}. ${getDescStyle(station)} Respond with ONLY the description text, nothing else.`;
+      desc = await callClaude(descPrompt, 120);
     } catch(e) { desc = ''; }
     card.querySelector('.btn-custom-accept').textContent = '✓ Added to menu';
   }
 
-  acceptedCount++;
+  const staged2 = getStagedItems();
+  staged2.push({ date, meal:selectedMeal, station, name, desc, location });
+  acceptedItems = staged2;
+  acceptedCount = staged2.length;
   document.getElementById('acceptedCount').textContent = `${acceptedCount} item${acceptedCount!==1?'s':''} accepted`;
-  acceptedItems.push({ date, meal:selectedMeal, station, name, desc, location });
   const badge = document.getElementById('publishBadge');
-  badge.textContent = acceptedItems.length; badge.classList.add('show');
+  badge.textContent = acceptedCount; badge.classList.add('show');
+  if (currentChef) saveCurrentSession();
 
   const ids = addToMenuPanelDirect(name, desc, station);
   addBOHLoading(name, ids.bohId);
@@ -1525,14 +1725,17 @@ function removeItem(itemId, bohId, name) {
   // Remove from Build tab panels
   document.getElementById(itemId)?.remove();
   document.getElementById(bohId)?.remove();
-  // Remove from acceptedItems array
-  acceptedItems = acceptedItems.filter(i => i.name !== name);
-  acceptedCount = Math.max(0, acceptedCount - 1);
+  // Remove from staged items for this location+week
+  const staged = getStagedItems();
+  const idx = staged.findIndex(i => i.name === name);
+  if (idx !== -1) staged.splice(idx, 1);
+  acceptedItems = staged;
+  acceptedCount = staged.length;
   document.getElementById('acceptedCount').textContent =
     acceptedCount + ' item' + (acceptedCount!==1?'s':'') + ' accepted';
   const badge = document.getElementById('publishBadge');
-  badge.textContent = acceptedItems.length;
-  if (!acceptedItems.length) badge.classList.remove('show');
+  badge.textContent = acceptedCount;
+  if (!acceptedCount) badge.classList.remove('show');
   // Remove from KPI dishes — just rebuild from acceptedItems
   populateKpiFromAccepted();
   // Remove from publish pubData
@@ -1563,11 +1766,15 @@ async function acceptItem(i) {
   card.classList.add('accepted');
   card.querySelector('.card-actions').innerHTML = `<div class="accepted-badge">✓ Added to menu</div>`;
 
-  acceptedCount++;
+  // Push to staged items for this location+week
+  const staged = getStagedItems();
+  staged.push({ date, meal:selectedMeal, station, name, desc, location });
+  acceptedItems = staged;
+  acceptedCount = staged.length;
   document.getElementById('acceptedCount').textContent = `${acceptedCount} item${acceptedCount!==1?'s':''} accepted`;
-  acceptedItems.push({ date, meal:selectedMeal, station, name, desc, location });
   const badge = document.getElementById('publishBadge');
-  badge.textContent = acceptedItems.length; badge.classList.add('show');
+  badge.textContent = acceptedCount; badge.classList.add('show');
+  if (currentChef) saveCurrentSession();
 
   const ids = addToMenuPanel(name, desc, station);
   addBOHLoading(name, ids.bohId);
@@ -1631,13 +1838,8 @@ Respond ONLY with valid JSON:
 {"ingredients":["item with quantity for ${size} servings"],"steps":["step"],"timing":"one sentence","mistakes":["dish-specific mistake"]}
 Requirements: 6-10 ingredients with realistic quantities for ${size} servings · 4-7 steps · 2-3 mistakes`;
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':window.API_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,messages:[{role:'user',content:prompt}]})
-    });
-    const data = await res.json();
-    return JSON.parse(data.content.map(b=>b.text||'').join('').replace(/```json|```/g,'').trim());
+    const text = await callClaude(prompt, 800);
+    return JSON.parse(text);
   } catch(e) { return {error:true, ingredients:[],steps:[],timing:'',mistakes:[]}; }
 }
 
@@ -1645,25 +1847,16 @@ Requirements: 6-10 ingredients with realistic quantities for ${size} servings ·
 // SEND TO PUBLISH
 // ═══════════════════════════
 function sendToPublish() {
-  if (!acceptedItems.length) { alert('No items accepted yet.'); return; }
+  const staged = getStagedItems();
+  if (!staged.length) { alert('No items accepted yet for this location and week.'); return; }
 
-  // Clear existing pubData for days that have new accepted items
-  // This prevents stacking from previous sessions
-  const affectedDays = new Set();
-  acceptedItems.forEach(item => {
-    if (!item.date) return;
-    const d = new Date(item.date+'T00:00:00');
-    const jsDay = d.getDay();
-    const dayIdx = jsDay===0 ? 6 : jsDay-1;
-    affectedDays.add(dayIdx);
-  });
-  affectedDays.forEach(dayIdx => {
-    const pd = getPubData();
-    pd[dayIdx] = {};
-  });
+  // Clear this week's pub data entirely, then rewrite from staged items
+  // This ensures deleted staged items are also removed from publish
+  const loc = getLoc(); const wk = getWeekKey();
+  if (!allPubData[loc]) allPubData[loc] = {};
+  allPubData[loc][wk] = {};
 
-  // Now write accepted items — last accepted item for a slot wins
-  acceptedItems.forEach(item => {
+  staged.forEach(item => {
     if (!item.date) return;
     const d = new Date(item.date+'T00:00:00');
     const jsDay = d.getDay();
@@ -1672,17 +1865,8 @@ function sendToPublish() {
     setPubCell(dayIdx, item.meal, station, item.name, item.desc);
   });
 
-  // Set week start from earliest accepted date
-  const dates = acceptedItems.map(i=>i.date).filter(Boolean).sort();
-  if (dates.length) {
-    const d = new Date(dates[0]+'T00:00:00');
-    const jsDay = d.getDay();
-    const daysToMon = jsDay===0 ? -6 : 1-jsDay;
-    const mon = new Date(d); mon.setDate(d.getDate()+daysToMon);
-    document.getElementById('pubWeekStart').value = mon.toISOString().split('T')[0];
-  }
-
-  document.getElementById('importNotice').innerHTML = `<strong>${acceptedItems.length} items</strong> imported from Build tab. Review below then export.`;
+  document.getElementById('importNotice').innerHTML =
+    `<strong>${staged.length} items</strong> published for ${loc}, ${weekLabel(wk)}.`;
   renderMenuCard();
   populateKpiFromAccepted();
   if (currentChef) saveCurrentSession();
@@ -1782,15 +1966,19 @@ function renderMenuCard() {
     </div>`;
   }
 
-  // ── Cell with macro ──
+  // ── Cell with macro and delete button ──
   function cell(dayIdx, meal, station) {
     const { name, desc } = getPubCell(dayIdx, meal, station);
-    return `<td class="mc-cell">
-      ${name
-        ? `<div class="mc-cell-name">${name}</div>
-           ${desc?`<div class="mc-cell-desc">${desc}</div>`:''}
-           ${macroHTML(name)}`
-        : `<div class="mc-cell-empty">—</div>`}
+    if (!name) return `<td class="mc-cell"><div class="mc-cell-empty">—</div></td>`;
+    const escapedStation = station.replace(/'/g, "\'");
+    return `<td class="mc-cell" style="position:relative;">
+      <button onclick="deletePubCell(${dayIdx},'${meal}','${escapedStation}')"
+        title="Remove from menu"
+        style="position:absolute;top:3px;right:3px;background:none;border:none;color:#D0C8BE;cursor:pointer;font-size:0.75rem;line-height:1;padding:1px 3px;border-radius:2px;transition:color 0.15s;"
+        onmouseover="this.style.color='#B84C27'" onmouseout="this.style.color='#D0C8BE'">×</button>
+      <div class="mc-cell-name">${name}</div>
+      ${desc?`<div class="mc-cell-desc">${desc}</div>`:''}
+      ${macroHTML(name)}
     </td>`;
   }
 
@@ -2203,13 +2391,8 @@ Respond ONLY with valid JSON array (same order as input):
 [{"cost_usd":0,"protein_g":0,"carbs_g":0,"fat_g":0}]`;
 
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages',{
-        method:'POST',
-        headers:{'Content-Type':'application/json','x-api-key':window.API_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1200,messages:[{role:'user',content:prompt}]})
-      });
-      const data = await res.json();
-      const estimates = JSON.parse(data.content.map(b=>b.text||'').join('').replace(/```json|```/g,'').trim());
+      const estimateText = await callClaude(prompt, 1200);
+      const estimates = JSON.parse(estimateText);
       dishesNeedingEstimate.forEach((dish, i) => {
         const est = estimates[i];
         if (!dish.costPerServing) dish.costPerServing = est.cost_usd;
@@ -2217,7 +2400,7 @@ Respond ONLY with valid JSON array (same order as input):
         if (!dish.carbs) dish.carbs = est.carbs_g;
         if (!dish.fat) dish.fat = est.fat_g;
       });
-      renderKpiDishList(); // refresh inputs with estimated values
+      renderKpiDishList();
     } catch(e) {
       resultsEl.innerHTML = `<div class="kpi-empty-state"><div>⚠️</div><div class="kpi-empty-label">Error estimating — try again or enter values manually</div></div>`;
       return;

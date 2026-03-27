@@ -457,6 +457,9 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
       <button class="pub-xbtn btn-pdf" onclick="exportPDF()">⬇ Download PDF</button>
       <button class="pub-xbtn btn-word" onclick="exportWord()">⬇ Download Word Doc</button>
       <div class="pub-note">PNG → WordPress · PDF → print · Word → edit</div>
+      <button onclick="clearPublishData()" style="background:transparent;border:1px solid #3A3530;color:#8A8278;padding:8px;font-family:'DM Mono',monospace;font-size:0.56rem;letter-spacing:0.1em;text-transform:uppercase;border-radius:4px;cursor:pointer;margin-top:4px;transition:all 0.2s;" onmouseover="this.style.borderColor='#B84C27';this.style.color='#B84C27'" onmouseout="this.style.borderColor='#3A3530';this.style.color='#8A8278'">
+        ✕ Clear This Week
+      </button>
     </div>
   </div>
 
@@ -1348,17 +1351,26 @@ Requirements: 6-10 ingredients with realistic quantities for ${size} servings ·
 function sendToPublish() {
   if (!acceptedItems.length) { alert('No items accepted yet.'); return; }
 
+  // Clear existing pubData for days that have new accepted items
+  // This prevents stacking from previous sessions
+  const affectedDays = new Set();
   acceptedItems.forEach(item => {
     if (!item.date) return;
     const d = new Date(item.date+'T00:00:00');
     const jsDay = d.getDay();
-    const dayIdx = jsDay===0 ? 6 : jsDay-1; // Mon=0…Sun=6
+    const dayIdx = jsDay===0 ? 6 : jsDay-1;
+    affectedDays.add(dayIdx);
+  });
+  affectedDays.forEach(dayIdx => { pubData[dayIdx] = {}; });
+
+  // Now write accepted items — last accepted item for a slot wins
+  acceptedItems.forEach(item => {
+    if (!item.date) return;
+    const d = new Date(item.date+'T00:00:00');
+    const jsDay = d.getDay();
+    const dayIdx = jsDay===0 ? 6 : jsDay-1;
     const station = item.meal==='Breakfast' ? 'Breakfast' : item.station;
-    const existing = getPubCell(dayIdx, item.meal, station);
-    // Append if there's already something in that cell
-    const newName = existing.name ? existing.name+' / '+item.name : item.name;
-    const newDesc = existing.desc ? existing.desc : item.desc;
-    setPubCell(dayIdx, item.meal, station, newName, newDesc);
+    setPubCell(dayIdx, item.meal, station, item.name, item.desc);
   });
 
   // Set week start from earliest accepted date
@@ -1381,6 +1393,13 @@ function sendToPublish() {
 // ═══════════════════════════
 // PUBLISH TAB
 // ═══════════════════════════
+function clearPublishData() {
+  if (!confirm('Clear all menu data for this week? This cannot be undone.')) return;
+  pubData = {};
+  renderMenuCard();
+  if (currentChef) saveCurrentSession();
+  document.getElementById('importNotice').innerHTML = '<strong>0 items</strong> from Build tab.<br>Accept dishes then click <em>"→ Send to Publish Tab"</em>.';
+}
 function initPubDays() {
   const container = document.getElementById('pubDayList');
   DAYS.forEach((day,i) => {

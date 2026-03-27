@@ -1298,28 +1298,92 @@ async function generateSuggestions() {
 
   const isFrat = ['Sig Ep','ADPhi','Delta Tau','Phi Delta Theta'].some(n=>location.includes(n.split(' ')[0]));
   const isSorority = ['Delta Delta Delta','Alpha Phi'].some(n=>location.includes(n.split(' ')[0]));
-  const audienceNote = isFrat ? `Fraternity house (${location}), ~40 members. Single cohesive meal — hearty, bold, protein-forward. No stations.`
-    : isSorority ? `Sorority house (${location}), ~40 members. Single cohesive meal — mix of fresh lighter options and satisfying comfort food. No stations.`
-    : `Hendrick House, large residential dining hall at University of Illinois.`;
 
-  const greekMealNote = greek ? `This is a single unified ${selectedMeal} menu for the whole house — not broken into stations. Generate 3 complete meal options, each with a main protein/entree plus 2 sides.` : '';
+  // ── Sharper audience profiles ──
+  let audienceNote = '';
+  if (isSorority) {
+    audienceNote = `Sorority house (${location}), ~40 members. These are health-conscious college women who love:
+- Bowl concepts: poke bowls, grain bowls, protein bowls, rice bowls, Mediterranean bowls
+- Fresh, bright, colorful dishes with clean flavors
+- Strong vegetarian/vegan options — at least 1 of the 3 suggestions should be plant-based
+- Lighter proteins: chicken breast, salmon, shrimp, tofu, legumes
+- Global flavors done in an accessible way: Korean, Thai, Mediterranean, Mexican
+- Avoid: heavy cream sauces, very rich or greasy dishes, anything that feels like "dorm food"
+This is a single cohesive meal — no stations. Generate 3 complete meals each with a main + 2 sides.`;
+  } else if (isFrat) {
+    audienceNote = `Fraternity house (${location}), ~40 members. These are hungry college men who love:
+- Comfort food with a creative twist: smash burgers, loaded pasta, wings with interesting sauces, tacos
+- Hearty portions, protein-forward, satisfying
+- IMPORTANT: always add a creative spin — not plain grilled chicken or basic spaghetti. Think: "Calabrian chili pasta" not "pasta with red sauce", "Korean BBQ smash burger" not "cheeseburger"
+- Bold flavors: smoky, spicy, umami-rich, tangy BBQ
+- One option should always be a solid vegetarian alternative that still feels hearty (not a salad)
+This is a single cohesive meal — no stations. Generate 3 complete meals each with a main + 2 sides.`;
+  } else {
+    // Hendrick House — station-specific profiles
+    if (station === 'Homestyle') {
+      audienceNote = `Hendrick House residential dining hall, University of Illinois — Homestyle station. Serves ~${Math.round((parseFloat(document.getElementById('asmLunch')?.value)||220) * 0.6)} students per service. This station is the crowd-pleaser — a blend of sorority-style freshness and fraternity-style heartiness. Think elevated comfort food that appeals to everyone: grain bowls alongside pasta bakes, global flavors with familiar proteins. Always include a plant-based alternative.`;
+    } else if (station === 'Veggie Life') {
+      audienceNote = `Hendrick House residential dining hall — Veggie Life station. 100% VEGETARIAN (no meat, no poultry, no seafood). This station must be genuinely exciting — not an afterthought. Think: creative tofu preparations, legume-based mains, globally-inspired vegetarian dishes, loaded veggie bowls, hearty grain dishes. Students choosing this station want something they're excited about, not just the meat dish minus the meat.`;
+    } else if (station === 'Sizzle') {
+      audienceNote = `Hendrick House — Sizzle station. This is the quick-service street food / snack counter. Think: globally-inspired small plates, shareable bites, handheld items. Creative but fast: dumplings, empanadas, loaded fries, mini sliders, spring rolls with interesting fillings. Should feel like a food market stall, not a cafeteria.`;
+    } else if (station === 'Pizza') {
+      audienceNote = `Hendrick House — Pizza station. Creative pizza — not just pepperoni. Think regional styles with interesting toppings: Detroit-style, white pizza, flatbreads, calzones, stromboli. One option should always be vegetarian. Bold, interesting combinations.`;
+    } else {
+      audienceNote = `Hendrick House, large residential dining hall at University of Illinois — ${station} station.`;
+    }
+  }
+
+  // ── Already accepted this week — for diversity enforcement ──
+  const alreadyAccepted = acceptedItems
+    .filter(item => item.location === location)
+    .map(item => item.name);
+
+  const diversityNote = alreadyAccepted.length > 0 ? `
+DIVERSITY ENFORCEMENT — Already accepted this week for ${location}:
+${alreadyAccepted.map(n => `- ${n}`).join('\n')}
+
+STRICT RULES to avoid repetition:
+1. Do NOT repeat any protein that already appears more than once (e.g. if chicken appears twice already, suggest something else)
+2. Do NOT reuse the same flavor profile or spice blend (e.g. if za'atar appears, no more za'atar; if harissa appears, no more harissa; if chimichurri appears, no more chimichurri)
+3. Do NOT reuse the same cooking technique prominently featured (e.g. if two dishes are already "crispy" fried items, vary the technique)
+4. Vary the cuisine region — if two dishes are already Middle Eastern / Mediterranean, pivot to Asian, Latin, American, or other
+5. The 3 new suggestions must collectively represent at least 2 different cuisine regions not yet heavily represented this week` : '';
+
+  const greekMealNote = greek ? `This is a single unified ${selectedMeal} menu for the whole house — not broken into stations.` : '';
 
   const prompt = `You are a professional chef consultant for a university food service company in Champaign, IL.
-Audience: ${audienceNote}
-${theme?`Chef's note: "${theme}"`:''}
-${inventory?`IMPORTANT — Ingredients to prioritize and use up: ${inventory}. Lean heavily toward suggestions that use these ingredients. If possible, all 3 options should incorporate at least one of these.`:''}
+
+${audienceNote}
+${theme ? `Chef's note: "${theme}"` : ''}
+${inventory ? `IMPORTANT — Ingredients to use up: ${inventory}. Lean heavily toward suggestions using these. All 3 options should incorporate at least one if possible.` : ''}
+${diversityNote}
 ${greekMealNote}
 ${getStylePrompt(location)}
-Generate exactly 3 distinct menu options for Meal: ${selectedMeal}, Date: ${date}${!greek?`, Station: ${station}`:''}.
-For each: (1) creative dish name${greek?' (can include sides e.g. "Harissa Chicken, Roasted Carrots, Herb Rice")':''}, (2) public-facing description: ${greek?'Rich, evocative 12-15 word description. Specific ingredients, cooking method, flavor. Sound elevated.':getDescStyle(station)}, (3) ${greek?'a plant-based alternative dish name only':'if Homestyle station: plant-based alt name only'}.
-Rules: vary cuisines · ${greek?'appeal to college-age members':'appeal to 18-22yr olds'} · no generic dishes${!greek?' · Sizzle=street food · Pizza=creative · Veggie Life=genuinely exciting':''}.
-Respond ONLY with valid JSON: {"options":[{"name":"","desc":"","vegAlt":null},{"name":"","desc":"","vegAlt":null},{"name":"","desc":"","vegAlt":null}]}`;
+
+Generate exactly 3 distinct menu options for:
+- Meal: ${selectedMeal}
+- Date: ${date}
+${!greek ? `- Station: ${station}` : ''}
+
+For each option provide:
+1. A creative, specific dish name${greek ? ' (format: "Main, Side 1, Side 2")' : ''}
+2. Public-facing description: ${greek || station === 'Homestyle' || station === 'Veggie Life' ? 'Rich, evocative 12-15 word description. Name key ingredients, cooking method, and what makes it special.' : station === 'Sizzle' ? 'Punchy 4-7 words. Bold and snappy.' : 'Concise 3-6 words. Style + key topping.'}
+3. ${(greek || station === 'Homestyle') ? 'A plant-based alternative dish name (name only, no description)' : 'null'}
+
+The 3 options MUST:
+- Span at least 2-3 different cuisine regions/styles
+- Use different primary proteins
+- Avoid repeating any flavor profiles, spice blends, or cooking techniques
+- Feel genuinely exciting and different from each other
+
+Respond ONLY with valid JSON:
+{"options":[{"name":"","desc":"","vegAlt":null},{"name":"","desc":"","vegAlt":null},{"name":"","desc":"","vegAlt":null}]}`;
 
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':window.API_KEY,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:prompt}]})
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1200,messages:[{role:'user',content:prompt}]})
     });
     if (!res.ok) { const e=await res.json(); throw new Error(e.error?.message||`HTTP ${res.status}`); }
     const data = await res.json();

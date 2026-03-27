@@ -1504,12 +1504,19 @@ function addToMenuPanelDirect(name, desc, station) {
   const itemId = 'mci-' + Date.now();
   const bohId = 'boh-' + itemId;
   const el = document.createElement('div');
-  el.className='menu-card-item'; el.id=itemId; el.dataset.name=name;
-  el.innerHTML=`
-    <button class="mci-remove" onclick="removeItem('${itemId}','${bohId}','${name.replace(/'/g,\"\'\")}')" title="Remove">×</button>
-    <div class="mci-station">${selectedMeal} · ${station}</div>
-    <div class="mci-name">${name}</div>
-    <div class="mci-desc">${desc}</div>`;
+    el.className='menu-card-item'; el.id=itemId; el.dataset.name=name;
+  // Build innerHTML without complex escaping - use data attribute for name
+  const removeBtn = document.createElement('button');
+  removeBtn.className = 'mci-remove';
+  removeBtn.title = 'Remove';
+  removeBtn.textContent = '×';
+  removeBtn.addEventListener('click', function() {
+    removeItem(itemId, bohId, this.closest('.menu-card-item').dataset.name);
+  });
+  const stationDiv = document.createElement('div'); stationDiv.className='mci-station'; stationDiv.textContent=selectedMeal+' · '+station;
+  const nameDiv = document.createElement('div'); nameDiv.className='mci-name'; nameDiv.textContent=name;
+  const descDiv = document.createElement('div'); descDiv.className='mci-desc'; descDiv.textContent=desc;
+  el.appendChild(removeBtn); el.appendChild(stationDiv); el.appendChild(nameDiv); el.appendChild(descDiv);
   out.appendChild(el);
   return { itemId, bohId };
 }

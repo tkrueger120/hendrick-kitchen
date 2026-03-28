@@ -472,9 +472,19 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
   </div>
 
   <div class="pub-right">
-    <div class="pub-preview-label">Live Preview — <span style="color:var(--sage);">&#9632;</span> Protein &nbsp;<span style="color:var(--gold);">&#9632;</span> Carbs &nbsp;<span style="color:var(--rust);">&#9632;</span> Fat &nbsp;· Macros appear after running Analyze tab</div>
+    <div class="pub-preview-label">Menu — <span style="color:var(--sage);">&#9632;</span> Protein &nbsp;<span style="color:var(--gold);">&#9632;</span> Carbs &nbsp;<span style="color:var(--rust);">&#9632;</span> Fat &nbsp;· Macros appear after running Analyze tab</div>
     <div style="overflow:auto;width:100%;">
       <div id="menuCard"></div>
+    </div>
+    <div id="bohSheetSection" style="display:none;margin-top:32px;max-width:900px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <div>
+          <div class="pub-preview-label" style="margin-bottom:2px;">BOH Reference Sheet</div>
+          <div style="font-family:'DM Mono',monospace;font-size:0.52rem;color:#8A8278;">Finalized prep notes — published with this week's menu</div>
+        </div>
+        <button onclick="exportBohPDF()" class="pub-xbtn btn-pdf" style="margin:0;">⬇ Download BOH PDF</button>
+      </div>
+      <div id="finalBohList"></div>
     </div>
   </div>
 </div>
@@ -998,6 +1008,16 @@ let currentWeekKey = '';
 // ── Published data: allPubData[loc][weekKey][dayIdx][rowKey] = { name, desc } ──
 let allPubData = {};
 
+// ── Finalized BOH notes: finalBohData[loc][weekKey] = [{ name, meal, station, date, bohData }] ──
+let finalBohData = {};
+
+function getFinalBoh() {
+  const loc = getLoc(); const wk = getWeekKey();
+  if (!finalBohData[loc]) finalBohData[loc] = {};
+  if (!finalBohData[loc][wk]) finalBohData[loc][wk] = [];
+  return finalBohData[loc][wk];
+}
+
 // ── Pub display settings per week ──
 let pubActiveDays = [0,1,2,3,4]; // Mon-Fri default
 
@@ -1198,6 +1218,7 @@ function saveCurrentSession() {
   data.version = STORAGE_VERSION;
   data.lastSaved = new Date().toISOString();
   data.pubData = allPubData;
+  data.finalBohData = finalBohData;
   data.stagedItems = stagedItems;
   data.availableWeeks = availableWeeks;
   data.currentWeekKey = currentWeekKey;
@@ -1236,6 +1257,7 @@ function loadChefSession(name) {
       });
     });
   }
+  if (data.finalBohData) finalBohData = data.finalBohData;
   if (data.stagedItems) stagedItems = data.stagedItems;
   if (data.availableWeeks && data.availableWeeks.length) {
     availableWeeks = data.availableWeeks;
@@ -1268,6 +1290,7 @@ function loadChefSession(name) {
   container.innerHTML = '';
   initPubDays();
   renderMenuCard();
+  renderFinalBohSheet();
   loadStyleSettings();
 }
 
@@ -1337,8 +1360,9 @@ function setCurrentWeek(wk) {
     '<div class="empty-state"><div class="empty-icon">&#127869;</div><div class="empty-label">Configure and generate options</div></div>';
   // Reload staged items for this week
   syncAcceptedFromStaged();
-  // Re-render publish card, week label, and KPI tab
+  // Re-render publish card, week label, KPI tab, and BOH sheet
   renderMenuCard();
+  renderFinalBohSheet();
   renderWeekSelector();
   updateKpiLocation();
   updateContextPill();
@@ -1571,6 +1595,7 @@ function onMasterLocationChange() {
   updateLocationUI();
   updateContextPill();
   renderMenuCard();
+  renderFinalBohSheet();
   loadStyleSettings();
   updateKpiLocation();
 }
@@ -1873,7 +1898,7 @@ function renderBOH(id, name, d) {
     el.innerHTML=`
       <div class="boh-card-name">🔪 ${name}</div>
       <div style="font-family:'DM Mono',monospace;font-size:0.6rem;color:#E07050;margin:6px 0;">Failed to load — API may be busy.</div>
-      <button onclick="retryBOH('${id.replace(/'/g,"\'")}','${name.replace(/'/g,"\'")}','${station.replace(/'/g,"\'")}','${loc.replace(/'/g,"\'")}',this)"
+      <button onclick="retryBOH('${id}','${name.replace(/'/g,'&apos;')}','${station}','${loc}',this)"
         style="background:var(--sage);color:#fff;border:none;padding:6px 12px;font-family:'DM Mono',monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;border-radius:3px;cursor:pointer;">
         ↺ Retry
       </button>`;
@@ -1887,6 +1912,10 @@ function renderBOH(id, name, d) {
     <ol class="boh-steps">${(d.steps||[]).map(s=>`<li>${s}</li>`).join('')}</ol>
     ${d.timing?`<div class="boh-sec">Key Timing</div><div class="boh-timing">${d.timing}</div>`:''}
     ${(d.mistakes||[]).length?`<div class="boh-sec">Watch Out For</div><ul class="boh-list">${d.mistakes.map(m=>`<li>⚠ ${m}</li>`).join('')}</ul>`:''}`;
+  // Store BOH data on matching staged item so it survives to publish
+  const staged = getStagedItems();
+  const stagedItem = staged.find(i => i.name === name);
+  if (stagedItem) { stagedItem._bohData = d; if (currentChef) saveCurrentSession(); }
 }
 
 async function retryBOH(id, name, station, loc, btn) {
@@ -1933,9 +1962,29 @@ function sendToPublish() {
     setPubCell(dayIdx, item.meal, station, item.name, item.desc);
   });
 
+  // Finalize BOH notes from staged items
+  if (!finalBohData[loc]) finalBohData[loc] = {};
+  finalBohData[loc][wk] = staged
+    .filter(item => item._bohData && !item._bohData.error)
+    .map(item => ({
+      name: item.name,
+      meal: item.meal,
+      station: item.station,
+      date: item.date,
+      location: item.location || loc,
+      bohData: item._bohData
+    }))
+    .sort((a,b) => {
+      // Sort chronologically by date then meal (Lunch before Dinner)
+      if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+      const mealOrder = { Breakfast:0, Lunch:1, Dinner:2 };
+      return (mealOrder[a.meal]||0) - (mealOrder[b.meal]||0);
+    });
+
   document.getElementById('importNotice').innerHTML =
     `<strong>${staged.length} items</strong> published for ${loc}, ${weekLabel(wk)}.`;
   renderMenuCard();
+  renderFinalBohSheet();
   populateKpiFromAccepted();
   if (currentChef) saveCurrentSession();
   switchTab('publish');
@@ -2194,6 +2243,80 @@ function exportBOHText() {
   a.href=URL.createObjectURL(new Blob([text],{type:'text/plain'}));
   a.download=`BOH_Notes_${getSelectedDayDate()||'notes'}.txt`;
   a.click();
+}
+
+// ═══════════════════════════
+// BOH SHEET RENDER & EXPORT
+// ═══════════════════════════
+function renderFinalBohSheet() {
+  const items = getFinalBoh();
+  const section = document.getElementById('bohSheetSection');
+  const list = document.getElementById('finalBohList');
+  if (!section || !list) return;
+  if (!items.length) { section.style.display='none'; return; }
+  section.style.display = 'block';
+  list.innerHTML = '';
+  items.forEach(item => {
+    const d = item.bohData;
+    const dateStr = item.date
+      ? new Date(item.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'})
+      : '';
+    const loc2 = item.location || getLoc();
+    const greek2 = isGreekHouse(loc2);
+    const serviceLabel = (greek2 || item.station==='Breakfast')
+      ? item.meal : item.meal+' · '+item.station;
+    const size = getServingSize();
+    const card = document.createElement('div');
+    card.style.cssText = 'background:#fff;border:1px solid #E8E2D9;border-radius:8px;padding:20px 24px;margin-bottom:16px;break-inside:avoid;';
+    card.innerHTML = `
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #E8E2D9;">
+        <div style="font-family:'Playfair Display',serif;font-size:1rem;color:#1A1714;">${item.name}</div>
+        <div style="font-family:'DM Mono',monospace;font-size:0.52rem;letter-spacing:0.1em;text-transform:uppercase;color:#8A8278;">${serviceLabel}${dateStr?' · '+dateStr:''}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div>
+          <div style="font-family:'DM Mono',monospace;font-size:0.52rem;letter-spacing:0.12em;text-transform:uppercase;color:#4A6741;margin-bottom:6px;">Ingredients (~${size} servings)</div>
+          <ul style="margin:0;padding-left:16px;font-size:0.78rem;line-height:1.8;color:#3A3530;">${(d.ingredients||[]).map(i=>`<li>${i}</li>`).join('')}</ul>
+        </div>
+        <div>
+          <div style="font-family:'DM Mono',monospace;font-size:0.52rem;letter-spacing:0.12em;text-transform:uppercase;color:#4A6741;margin-bottom:6px;">Prep & Cooking Steps</div>
+          <ol style="margin:0;padding-left:16px;font-size:0.78rem;line-height:1.8;color:#3A3530;">${(d.steps||[]).map(s=>`<li>${s}</li>`).join('')}</ol>
+        </div>
+      </div>
+      ${d.timing ? `<div style="margin-top:10px;padding-top:8px;border-top:1px solid #E8E2D9;font-family:'DM Mono',monospace;font-size:0.58rem;color:#8A8278;"><span style="color:#B84C27;text-transform:uppercase;letter-spacing:0.1em;font-size:0.5rem;">Timing · </span>${d.timing}</div>` : ''}
+      ${(d.mistakes||[]).length ? `<div style="margin-top:8px;"><div style="font-family:'DM Mono',monospace;font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;color:#B84C27;margin-bottom:4px;">Watch Out For</div><ul style="margin:0;padding-left:16px;font-size:0.74rem;line-height:1.7;color:#8A8278;">${d.mistakes.map(m=>`<li>⚠ ${m}</li>`).join('')}</ul></div>` : ''}`;
+    list.appendChild(card);
+  });
+}
+
+function exportBohPDF() {
+  const items = getFinalBoh();
+  if (!items.length) { alert('No finalized BOH notes yet — click Send to Publish first.'); return; }
+  const loc = getLoc(); const wk = getWeekKey();
+  const styles = Array.from(document.querySelectorAll('style')).map(s=>s.innerHTML).join(' ');
+  const bohHtml = document.getElementById('finalBohList').innerHTML;
+  const win = window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html><head>
+    <title>BOH Reference — ${loc} ${weekLabel(wk)}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+      body{margin:0;padding:24px 32px;font-family:'DM Sans',sans-serif;background:#fff;color:#1A1714;}
+      @page{size:portrait;margin:0.4in;}
+      @media print{.no-print{display:none;}}
+      .boh-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;padding-bottom:14px;border-bottom:3px solid #1A1714;}
+      .boh-title{font-family:'Playfair Display',serif;font-size:1.4rem;color:#1A1714;}
+      .boh-title span{color:#C9973A;font-style:italic;}
+      .boh-meta{font-family:'DM Mono',monospace;font-size:0.58rem;letter-spacing:0.1em;text-transform:uppercase;color:#8A8278;text-align:right;line-height:1.8;}
+    </style>
+    </head><body>
+    <div class="boh-header">
+      <div class="boh-title">${loc} <span>Kitchen</span></div>
+      <div class="boh-meta">BOH Reference Sheet<br>${weekLabel(wk)}<br>${items.length} dish${items.length!==1?'es':''}</div>
+    </div>
+    ${bohHtml}
+  </body></html>`);
+  win.document.close();
+  setTimeout(()=>{ win.focus(); win.print(); win.close(); }, 900);
 }
 
 // ═══════════════════════════

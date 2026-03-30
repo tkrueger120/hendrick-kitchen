@@ -97,6 +97,14 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
 .btn-reject{background:transparent;border-color:var(--mist);color:var(--warm-gray);}
 .btn-reject:hover{background:var(--mist);}
 .accepted-badge{font-family:'DM Mono',monospace;font-size:0.56rem;color:var(--accept);letter-spacing:0.1em;text-align:center;padding-top:5px;}
+.btn-swap{background:none;border:none;font-family:'DM Mono',monospace;font-size:0.52rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--warm-gray);cursor:pointer;padding:4px 0 0;transition:color 0.15s;text-align:left;}
+.btn-swap:hover{color:var(--gold);}
+.protein-opt{background:#F7F3EC;border:1px solid var(--mist);color:var(--ink);font-family:'DM Mono',monospace;font-size:0.54rem;padding:4px 8px;border-radius:3px;cursor:pointer;transition:all 0.15s;letter-spacing:0.04em;}
+.protein-opt:hover{border-color:var(--gold);color:var(--gold);}
+.protein-opt.active{background:var(--ink);border-color:var(--ink);color:#fff;}
+.btn-regen{background:var(--rust);color:#fff;border:none;padding:6px 12px;font-family:'DM Mono',monospace;font-size:0.56rem;letter-spacing:0.1em;text-transform:uppercase;border-radius:3px;cursor:pointer;transition:all 0.2s;}
+.btn-regen:disabled{background:var(--mist);color:var(--warm-gray);cursor:not-allowed;}
+.btn-regen:not(:disabled):hover{background:#9A3D1F;}
 .loading-state{grid-column:1/-1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;gap:12px;color:var(--warm-gray);}
 .spinner{width:26px;height:26px;border:2px solid var(--mist);border-top-color:var(--rust);border-radius:50%;animation:spin 0.8s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -1646,14 +1654,104 @@ This is a single cohesive meal — no stations. Generate 3 complete meals each w
 This is a single cohesive meal — no stations. Generate 3 complete meals each with a main + 2 sides.`;
   } else {
     // Hendrick House — station-specific profiles
+    const hhCount = Math.round((parseFloat(document.getElementById('asmLunch')?.value)||220));
+
+    // Build ingredient context from already-accepted dishes this week at ALL HH stations
+    const hhAccepted = acceptedItems.filter(i => i.location === location);
+    const ingredientContext = hhAccepted.length > 0
+      ? `\nAlready on this week's menu at other stations:\n${hhAccepted.map(i => `- ${i.name} (${i.meal}, ${i.station})`).join('\n')}`
+      : '';
+
     if (station === 'Homestyle') {
-      audienceNote = `Hendrick House residential dining hall, University of Illinois — Homestyle station. Serves ~${Math.round((parseFloat(document.getElementById('asmLunch')?.value)||220) * 0.6)} students per service. This station is the crowd-pleaser — a blend of sorority-style freshness and fraternity-style heartiness. Think elevated comfort food that appeals to everyone: grain bowls alongside pasta bakes, global flavors with familiar proteins. Always include a plant-based alternative.`;
+      audienceNote = `Hendrick House residential dining hall — Homestyle station. Large-batch cooking for ~${Math.round(hhCount * 0.6)} students per service.
+
+COOKING CONSTRAINTS — this is large-batch production:
+- Everything is cooked in large batches, NOT individually. No skillet-to-plate preparations.
+- Ideal methods: oven-roasted, baked, braised, slow-cooked, large-pot simmered, sheet-pan
+- Large 3-foot open-flame pots are available — great for curries, stews, soups, boils
+- Examples of what works great: roast chicken, baked salmon, roasted root vegetables, large-batch curries, braised meats, rice dishes, pasta bakes
+- Examples of what does NOT work: pan-seared individual portions, made-to-order stir fry, individually plated proteins
+
+FLAVOR PROFILE:
+- Crowd-pleaser blend of sorority-style freshness and fraternity-style heartiness
+- IMPORTANT: include South Asian dishes regularly — curries, tikka masala, dal, biryani work exceptionally well for large-batch cooking and students love them
+- Also lean into other large-batch-friendly global cuisines: Moroccan tagines, Mexican braises, Italian pasta bakes, Middle Eastern rice dishes
+- Great opportunity for seasonal cooking — use peak-season produce
+- Always include a plant-based alternative dish name${ingredientContext}`;
+
     } else if (station === 'Veggie Life') {
-      audienceNote = `Hendrick House residential dining hall — Veggie Life station. 100% VEGETARIAN (no meat, no poultry, no seafood). This station must be genuinely exciting — not an afterthought. Think: creative tofu preparations, legume-based mains, globally-inspired vegetarian dishes, loaded veggie bowls, hearty grain dishes. Students choosing this station want something they're excited about, not just the meat dish minus the meat.`;
+      // Find what's at Homestyle tonight for ingredient overlap
+      const homestyle = hhAccepted.filter(i => i.station === 'Homestyle' && i.meal === selectedMeal);
+      const homestyleContext = homestyle.length > 0
+        ? `\nHomestyle dishes tonight: ${homestyle.map(i=>i.name).join(', ')}\nAim for ~50% ingredient/spice profile overlap with Homestyle. For example if Homestyle has chicken tikka masala, a great Veg Life option is paneer tikka masala OR a different dish using similar spices (cumin, coriander, garam masala). Don't always do the identical dish — vary it 50% of the time.`
+        : '';
+
+      audienceNote = `Hendrick House residential dining hall — Veggie Life station. 100% VEGETARIAN (no meat, no poultry, no seafood — eggs and dairy are fine).
+
+CORE RULES:
+- Must be genuinely exciting — not an afterthought or a sad salad
+- Aim for ~50% spice/ingredient overlap with whatever is at Homestyle tonight (purchasing efficiency + cohesive menu feel)
+- Occasionally it's perfect to do a direct vegetarian version (e.g. paneer instead of chicken), but vary it — don't do this every night
+- Budget-conscious: no expensive proteins. Lean on paneer, tofu, beans, lentils, chickpeas, eggs, hearty vegetables
+- Students especially love: paneer dishes, tofu preparations, bean-based mains, stuffed vegetables, grain bowls
+- Do NOT repeat the same protein (paneer, tofu, beans) on consecutive nights or more than twice in a week
+- Health-forward but still satisfying and well-flavored — should feel like a restaurant-quality vegetarian dish, not diet food
+- Large-batch cooking constraints apply here too (oven, braise, simmer — not individual portions)${homestyle.length > 0 ? homestyleContext : ingredientContext}`;
+
     } else if (station === 'Sizzle') {
-      audienceNote = `Hendrick House — Sizzle station. This is the quick-service street food / snack counter. Think: globally-inspired small plates, shareable bites, handheld items. Creative but fast: dumplings, empanadas, loaded fries, mini sliders, spring rolls with interesting fillings. Should feel like a food market stall, not a cafeteria.`;
+      // Find other station dishes tonight for "special that plays on other ingredients"
+      const tonightOther = hhAccepted.filter(i => i.meal === selectedMeal && i.station !== 'Sizzle');
+      const tonightContext = tonightOther.length > 0
+        ? `\nOther stations tonight: ${tonightOther.map(i=>`${i.station}: ${i.name}`).join(', ')}\nThe Sizzle special should ideally play on or complement one of these — shared ingredients, similar spice profile, or a fun contrast.`
+        : '';
+
+      audienceNote = `Hendrick House — Sizzle station. This is a GRILL STATION — everything is cooked to order on a grill or flat-top, individually portioned.
+
+WHAT ALWAYS EXISTS (don't suggest these — they're always available):
+- Made-to-order burgers (beef patty)
+- Made-to-order chicken patties
+- Veggie burgers
+
+WHAT YOU'RE GENERATING: One "Sizzle Special" per meal service — a creative grill-friendly option that rotates daily. This is the interesting option beyond the standard burgers.
+
+GREAT SIZZLE SPECIALS:
+- Creative sandwiches and burgers: spicy chicken sandwich, smash burgers with interesting toppings, salmon burgers
+- Grilled wraps and quesadillas
+- Grilled proteins with interesting sauces: jerk chicken thighs, teriyaki glazed items
+- Occasional "breakfast for dinner": pancakes, omelets, breakfast burritos (works great once a week)
+- Fancy grilled cheese variants: different cheeses, additions, bread styles
+- Falafel pitas, grilled halloumi wraps, taquitos on the grill
+- Items that play on ingredients from other stations tonight
+
+DESCRIPTION STYLE: Punchy 4-7 words. Bold and snappy. (e.g. "Crispy Falafel Pita, Garlic Sauce" or "Spicy Nashville Chicken Sandwich")
+Generate 3 Sizzle Special options (not the standard burgers — those are always there).${tonightContext}`;
+
     } else if (station === 'Pizza') {
-      audienceNote = `Hendrick House — Pizza station. Creative pizza — not just pepperoni. Think regional styles with interesting toppings: Detroit-style, white pizza, flatbreads, calzones, stromboli. One option should always be vegetarian. Bold, interesting combinations.`;
+      // Find ingredients from other stations to recycle
+      const tonightAll = hhAccepted.filter(i => i.meal === selectedMeal && i.station !== 'Pizza');
+      const prevNight = hhAccepted.filter(i => i.station !== 'Pizza');
+      const recycleContext = tonightAll.length > 0
+        ? `\nIngredients available from tonight's other stations: ${tonightAll.map(i=>i.name).join(', ')}\nPizza station is a "recycling station" — look for ways to repurpose these ingredients as toppings or elements. E.g. if Homestyle has tikka masala chicken, a tikka masala pizza works great.`
+        : prevNight.length > 0
+        ? `\nIngredients from this week's menu to potentially recycle: ${prevNight.slice(-4).map(i=>i.name).join(', ')}`
+        : '';
+
+      audienceNote = `Hendrick House — Pizza station.
+
+IMPORTANT CONTEXT:
+- Standard pizzas (cheese, mushroom, basic toppings) are ALWAYS available — don't suggest these
+- You're generating the FEATURED/SPECIAL pizza(s) that rotate nightly
+- Pizza station is the "recycling station" — great opportunity to repurpose ingredients from other stations
+
+WHAT TO GENERATE:
+- Vary the crust style each night: NY style, Detroit style, flatbread, Sicilian, thin crust, calzone, stromboli — rotate through these
+- Creative topping combinations, often inspired by other stations' ingredients
+- Always include one vegetarian option
+- Think beyond Italian — tikka masala pizza, Korean BBQ pizza, Mexican street corn flatbread all work great
+
+DESCRIPTION STYLE: Concise 3-6 words. Style + key topping. (e.g. "Detroit-Style Tikka Masala" or "Flatbread, Roasted Garlic & Brie")
+Generate 3 featured pizza options.${recycleContext}`;
+
     } else {
       audienceNote = `Hendrick House, large residential dining hall at University of Illinois — ${station} station.`;
     }
@@ -1665,15 +1763,16 @@ This is a single cohesive meal — no stations. Generate 3 complete meals each w
     .map(item => item.name);
 
   const diversityNote = alreadyAccepted.length > 0 ? `
-DIVERSITY ENFORCEMENT — Already accepted this week for ${location}:
+DIVERSITY & INGREDIENT-SHARING RULES — Already accepted this week for ${location}:
 ${alreadyAccepted.map(n => `- ${n}`).join('\n')}
 
-STRICT RULES to avoid repetition:
-1. Do NOT repeat any protein that already appears more than once (e.g. if chicken appears twice already, suggest something else)
-2. Do NOT reuse the same flavor profile or spice blend (e.g. if za'atar appears, no more za'atar; if harissa appears, no more harissa; if chimichurri appears, no more chimichurri)
-3. Do NOT reuse the same cooking technique prominently featured (e.g. if two dishes are already "crispy" fried items, vary the technique)
-4. Vary the cuisine region — if two dishes are already Middle Eastern / Mediterranean, pivot to Asian, Latin, American, or other
-5. The 3 new suggestions must collectively represent at least 2 different cuisine regions not yet heavily represented this week` : '';
+STRICT RULES:
+1. FLAVOR DIVERSITY: Do NOT reuse the same flavor profile or spice blend already on the menu (e.g. if za'atar appears, no more za'atar this week; same for harissa, chimichurri, tikka, teriyaki, etc.)
+2. PROTEIN ROTATION: Do NOT use any protein that already appears more than once this week
+3. TECHNIQUE VARIETY: Vary cooking techniques — avoid 3+ dishes using the same method
+4. CUISINE ROTATION: Vary cuisine regions day-to-day. Same cuisine at two stations on the same day is fine (cohesion), but avoid the same cuisine region 3+ days in a row
+5. INGREDIENT EFFICIENCY: Where possible, suggest dishes that reuse ingredients already on the menu this week (purchasing efficiency) — but in a different flavor direction
+6. SAME-DAY COHESION: It's good if stations on the same day share ingredients or a loose flavor theme — this helps purchasing and creates a cohesive meal experience` : '';
 
   const greekMealNote = greek ? `This is a single unified ${selectedMeal} menu for the whole house — not broken into stations.` : '';
 
@@ -1722,6 +1821,9 @@ function renderSuggestions(options, station) {
   options.forEach((opt,i) => {
     const card = document.createElement('div');
     card.className='sugg-card'; card.id=`card-${i}`;
+    card.dataset.station = station;
+    card.dataset.originalName = opt.name;
+    card.dataset.originalDesc = opt.desc;
     card.innerHTML=`
       <div class="dish-name">${opt.name}</div>
       ${opt.vegAlt?`<div class="dish-veg">🌱 ${opt.vegAlt}</div>`:''}
@@ -1729,7 +1831,17 @@ function renderSuggestions(options, station) {
       <div class="card-actions">
         <button class="btn-accept" onclick="acceptItem(${i})">✓ Accept</button>
         <button class="btn-reject" onclick="document.getElementById('card-${i}').classList.add('rejected')">✕ Skip</button>
-      </div>`;
+      </div>
+      <div class="swap-zone" id="swap-${i}" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--mist);">
+        <div style="font-family:'DM Mono',monospace;font-size:0.52rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--warm-gray);margin-bottom:6px;">Swap protein</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="protein-btns-${i}">
+          ${['Chicken','Beef','Pork','Salmon','Shrimp','Tofu','Lamb','Turkey','Chickpeas','Eggs'].map(p =>
+            `<button class="protein-opt" onclick="selectProtein(${i},'${p}')" data-protein="${p}">${p}</button>`
+          ).join('')}
+        </div>
+        <button class="btn-regen" id="regen-${i}" onclick="regenWithProtein(${i})" disabled>↺ Regenerate</button>
+      </div>
+      <button class="btn-swap" onclick="toggleSwap(${i})">⇄ Swap Protein</button>`;
     grid.appendChild(card);
   });
 
@@ -1742,6 +1854,63 @@ function renderSuggestions(options, station) {
     <textarea class="custom-desc-input" id="customDesc" rows="2" placeholder="Description (optional — leave blank to auto-generate)"></textarea>
     <button class="btn-custom-accept" onclick="acceptCustomItem()">✓ Accept Custom Dish</button>`;
   grid.appendChild(custom);
+}
+
+function toggleSwap(i) {
+  const zone = document.getElementById(`swap-${i}`);
+  const btn = document.querySelector(`#card-${i} .btn-swap`);
+  const showing = zone.style.display !== 'none';
+  zone.style.display = showing ? 'none' : 'block';
+  btn.textContent = showing ? '⇄ Swap Protein' : '✕ Cancel Swap';
+  btn.style.color = showing ? '' : 'var(--rust)';
+}
+
+function selectProtein(i, protein) {
+  // Highlight selected protein button
+  document.querySelectorAll(`#protein-btns-${i} .protein-opt`).forEach(b => {
+    b.classList.toggle('active', b.dataset.protein === protein);
+  });
+  document.getElementById(`regen-${i}`).disabled = false;
+  document.getElementById(`regen-${i}`).dataset.protein = protein;
+}
+
+async function regenWithProtein(i) {
+  const card = document.getElementById(`card-${i}`);
+  const regenBtn = document.getElementById(`regen-${i}`);
+  const protein = regenBtn.dataset.protein;
+  const station = card.dataset.station;
+  const originalName = card.dataset.originalName;
+  const originalDesc = card.dataset.originalDesc;
+  const location = document.getElementById('masterLocation').value;
+
+  regenBtn.textContent = '↺ Regenerating…';
+  regenBtn.disabled = true;
+
+  const prompt = `You are a professional chef consultant. A chef wants to swap the protein in this dish to ${protein}.
+
+Original dish: "${originalName}"
+Original description: "${originalDesc}"
+Station: ${station}
+Location: ${location}
+
+Rewrite the dish with ${protein} as the primary protein. Keep the same general flavor profile and cooking style, but adapt the name and description so they make sense for ${protein}. 
+
+Respond ONLY with valid JSON: {"name":"","desc":""}`;
+
+  try {
+    const text = await callClaude(prompt, 200);
+    const result = JSON.parse(text);
+    card.querySelector('.dish-name').textContent = result.name;
+    card.querySelector('.dish-desc').textContent = result.desc;
+    card.dataset.originalName = result.name;
+    card.dataset.originalDesc = result.desc;
+    // Close the swap zone
+    toggleSwap(i);
+    regenBtn.textContent = '↺ Regenerate';
+  } catch(e) {
+    regenBtn.textContent = '↺ Failed — retry';
+    regenBtn.disabled = false;
+  }
 }
 
 async function acceptCustomItem() {

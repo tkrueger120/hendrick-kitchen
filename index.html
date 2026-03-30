@@ -1636,6 +1636,8 @@ async function generateSuggestions() {
   // ── Sharper audience profiles ──
   let audienceNote = '';
   if (isSorority) {
+    const isMonday = selectedDayIndex === 0;
+    const isMonDinner = isMonday && selectedMeal === 'Dinner';
     audienceNote = `Sorority house (${location}), ~40 members. These are health-conscious college women who love:
 - Bowl concepts: poke bowls, grain bowls, protein bowls, rice bowls, Mediterranean bowls
 - Fresh, bright, colorful dishes with clean flavors
@@ -1643,14 +1645,18 @@ async function generateSuggestions() {
 - Lighter proteins: chicken breast, salmon, shrimp, tofu, legumes
 - Global flavors done in an accessible way: Korean, Thai, Mediterranean, Mexican
 - Avoid: heavy cream sauces, very rich or greasy dishes, anything that feels like "dorm food"
+${isMonDinner ? `MONDAY CHAPTER NIGHT — volume is 2-3x normal. ALL 3 suggestions MUST be pasta-based dishes. Be creative — not just spaghetti and meatballs. Think: baked ziti, pasta primavera, pesto tortellini, orzo salads, creamy mushroom pappardelle, Thai peanut noodles, cold sesame noodles. Pasta is the format; the flavor profile can range widely.` : ''}
 This is a single cohesive meal — no stations. Generate 3 complete meals each with a main + 2 sides.`;
   } else if (isFrat) {
+    const isMonday = selectedDayIndex === 0;
+    const isMonDinner = isMonday && selectedMeal === 'Dinner';
     audienceNote = `Fraternity house (${location}), ~40 members. These are hungry college men who love:
 - Comfort food with a creative twist: smash burgers, loaded pasta, wings with interesting sauces, tacos
 - Hearty portions, protein-forward, satisfying
 - IMPORTANT: always add a creative spin — not plain grilled chicken or basic spaghetti. Think: "Calabrian chili pasta" not "pasta with red sauce", "Korean BBQ smash burger" not "cheeseburger"
 - Bold flavors: smoky, spicy, umami-rich, tangy BBQ
 - One option should always be a solid vegetarian alternative that still feels hearty (not a salad)
+${isMonDinner ? `MONDAY CHAPTER NIGHT — volume is 2-3x normal. ALL 3 suggestions MUST be pasta-based dishes. Be creative and bold — not just spaghetti and meatballs. Think: baked mac and cheese with pulled pork, spicy arrabbiata rigatoni, lasagna bolognese, vodka penne, loaded baked pasta, ramen-style noodle bowls. Pasta is the format; keep the flavors hearty and interesting.` : ''}
 This is a single cohesive meal — no stations. Generate 3 complete meals each with a main + 2 sides.`;
   } else {
     // Hendrick House — station-specific profiles

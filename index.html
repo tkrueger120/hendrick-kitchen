@@ -847,29 +847,194 @@ function buildStyleSummary(loc) {
 function getStylePrompt(loc) {
   const s = getStyleSettings(loc);
   const lines = [];
-  const desc = (id, low, mid, high) => {
-    const v = s[id];
-    if (v <= 3) return low;
-    if (v >= 7) return high;
-    return mid;
-  };
-  lines.push(`Spice: ${desc('spicy','Very mild and approachable','Moderate spice acceptable','Bold and spicy flavors preferred')}`);
-  lines.push(`Health: ${desc('healthy','Rich, indulgent, comfort-focused','Balanced health/indulgence','Health-conscious, lean ingredients preferred')}`);
-  lines.push(`Asian influence: ${desc('asian','Avoid Asian cuisines','Asian cuisines welcome occasionally','Strongly lean toward Asian cuisines')}`);
-  lines.push(`Seasonality: ${desc('seasonal','Ignore seasons, use any ingredients','Somewhat seasonal','Use highly seasonal, peak-freshness ingredients')}`);
-  lines.push(`Comfort: ${desc('comfort','Light, fresh, refined preparations','Mix of comfort and light','Hearty comfort food strongly preferred')}`);
-  lines.push(`Trend: ${desc('hip','Classic and traditional recipes only','Mix of classic and trendy','Hip, trend-forward, Instagram-worthy concepts')}`);
-  lines.push(`Global: ${desc('global','Stick to American cuisine','Mix of American and global','Prioritize diverse world cuisines')}`);
-  lines.push(`Protein: ${desc('protein','Plant-forward, minimize meat','Balance plant and meat proteins','Meat-forward, protein-heavy dishes')}`);
-  lines.push(`Complexity: ${desc('complex','Simple, minimal-technique dishes','Moderate complexity','Chef-driven, complex technique welcome')}`);
-  lines.push(`Portions: ${desc('portion','Lighter, smaller portions','Standard portions','Generous, satisfying portions')}`);
-  lines.push(`Ingredients: ${desc('premium','Budget-conscious, value ingredients','Mid-range ingredients','Premium, high-quality ingredients')}`);
-  lines.push(`Variety: ${desc('variety','Stick to familiar, reliable dishes','Some variety','Adventurous, unexpected flavor combinations')}`);
 
-  // Budget + premium constraints
+  // Helper: pick the right description for an 0-10 value from an 11-element array
+  const pick = (id, opts) => opts[Math.min(10, Math.max(0, Math.round(s[id]||5)))];
+
+  // SPICE LEVEL (0=no heat, 10=very spicy)
+  lines.push('Spice level: ' + pick('spicy', [
+    'No heat whatsoever — completely mild, no chili, no pepper beyond black pepper',
+    'Barely detectable warmth — a hint of mild spice for interest only',
+    'Mild — gentle spice that most people would not notice as "spicy"',
+    'Mild-medium — noticeable warmth but not challenging for sensitive palates',
+    'Medium — present spice that most diners enjoy, nothing intense',
+    'Medium — moderate heat, clearly seasoned but not overwhelming',
+    'Medium-high — confidently spicy, noticeable heat that some may find strong',
+    'High — bold heat, dishes that self-select spice-tolerant diners',
+    'Very high — prominent chili heat as a defining feature of each dish',
+    'Intense — assertive, mouth-warming heat throughout',
+    'Maximum heat — fire-forward, very spicy dishes for heat seekers only'
+  ]));
+
+  // HEALTH FOCUS (0=indulgent, 10=health-forward)
+  lines.push('Health focus: ' + pick('healthy', [
+    'Fully indulgent — rich sauces, fried preparations, butter, cream, no calorie consideration',
+    'Very indulgent — comfort-first, richness is the goal, minimal health consideration',
+    'Indulgent-leaning — hearty and satisfying, occasional lighter option fine',
+    'Slight comfort lean — mostly satisfying dishes with one lighter option among 3',
+    'Balanced — mix of indulgent and lighter options, roughly equal split',
+    'Slightly health-conscious — lean toward lighter but still satisfying',
+    'Health-conscious — lean proteins, vegetables prominent, sauces on the side',
+    'Health-forward — at least 2 of 3 suggestions low in saturated fat, whole ingredients',
+    'Very health-forward — all suggestions prioritize lean proteins, vegetables, whole grains',
+    'Clean eating — minimal processed ingredients, whole foods only, very low fat',
+    'Maximum health — all dishes could appear on a dietitian-approved menu'
+  ]));
+
+  // ASIAN INFLUENCE (0=none, 10=dominant)
+  lines.push('Asian cuisine influence: ' + pick('asian', [
+    'No Asian cuisines at all — avoid any Asian flavors, ingredients, or techniques',
+    'Almost no Asian — only use if no other option makes sense',
+    'Minimal Asian — rare, maybe 1 in 10 suggestions could be Asian-inspired',
+    'Low — Asian cuisine is one of many options, not a priority',
+    'Occasional — roughly 1 of 4 suggestions may draw on Asian flavors',
+    'Balanced — Asian cuisine equally weighted with other global regions',
+    'Moderate lean — roughly 1-2 of 3 suggestions may have Asian influence',
+    'Strong lean — Asian cuisines are the preferred direction',
+    'Heavy Asian — most suggestions should draw from Asian culinary traditions',
+    'Predominantly Asian — nearly all suggestions should be Asian-inspired',
+    'All Asian — every suggestion should come from an Asian culinary tradition'
+  ]));
+
+  // SEASONALITY (0=ignore seasons, 10=strictly seasonal)
+  lines.push('Seasonality: ' + pick('seasonal', [
+    'Completely ignore seasonality — use any ingredient year-round with no consideration',
+    'Season largely irrelevant — use whatever ingredients are available',
+    'Minimal seasonal consideration — only avoid obviously out-of-season items',
+    'Light seasonal awareness — prefer in-season when it does not limit creativity',
+    'Moderate seasonal lean — in-season produce preferred but not required',
+    'Seasonally aware — most produce and proteins should be in or near peak season',
+    'Seasonal-first — anchor each dish to 1-2 peak-season ingredients',
+    'Strongly seasonal — all featured ingredients should be at peak this time of year',
+    'Highly seasonal — dishes should feel unmistakably tied to the current season',
+    'Very strictly seasonal — reject any ingredient that is not in peak season',
+    'Strictly seasonal — every ingredient must be at its seasonal peak, no exceptions'
+  ]));
+
+  // COMFORT FOOD (0=light/refined, 10=pure comfort)
+  lines.push('Comfort food level: ' + pick('comfort', [
+    'Light and refined only — no heavy dishes, think restaurant-quality fresh preparations',
+    'Very light — clean, elegant, minimal richness',
+    'Light-leaning — fresh preparations dominant, occasional warm dish acceptable',
+    'Mostly light with one hearty option among the 3 suggestions',
+    'Balanced — roughly equal split between light and hearty options',
+    'Slight comfort lean — warmth and satisfaction, still varied',
+    'Comfort-forward — at least 2 of 3 suggestions are warm, satisfying comfort dishes',
+    'Strongly comfort-focused — think braised, baked, slow-cooked, crowd-pleasing',
+    'Heavy comfort food — rich, warming, substantial dishes dominate',
+    'Very heavy comfort — think casseroles, loaded dishes, deeply satisfying meals',
+    'Pure comfort food only — every dish should feel like a warm hug, no exceptions'
+  ]));
+
+  // TRENDY vs CLASSIC (0=traditional, 10=very trendy)
+  lines.push('Trend vs classic: ' + pick('hip', [
+    'Classic only — timeless dishes, nothing trendy, no Instagram-bait concepts',
+    'Almost entirely classic — only very established preparations',
+    'Mostly classic with rare modern interpretation acceptable',
+    'Traditional-leaning — classic techniques and flavor combinations predominate',
+    'Balanced — mix of classic dishes and modern interpretations',
+    'Slightly contemporary — modern techniques and global fusion acceptable',
+    'Modern-leaning — at least 1 of 3 suggestions should feel current and fresh',
+    'Trend-forward — at least 2 of 3 suggestions should feel contemporary',
+    'Hip and trend-aware — all suggestions should feel current, Instagram-worthy',
+    'Very trend-forward — cutting-edge concepts, viral food moments, bold presentations',
+    'Maximum trend — every dish should feel like it belongs in a trendy urban restaurant'
+  ]));
+
+  // GLOBAL CUISINE (0=American, 10=world cuisine)
+  lines.push('Global vs American: ' + pick('global', [
+    'American only — classic American comfort food, no global influence',
+    'Almost entirely American — only very familiar American dishes',
+    'Mostly American — 1 global-inspired dish per 3 acceptable',
+    'American-leaning — familiar base with occasional global flavor',
+    'Balanced — roughly equal American and global options',
+    'Slightly global-leaning — world cuisines welcome alongside American',
+    'Global-forward — at least 2 of 3 suggestions from non-American cuisines',
+    'Strongly global — most suggestions should come from world cuisines',
+    'Predominantly global — American-style dishes should be rare',
+    'Almost entirely global — all suggestions from international cuisines',
+    'Maximum global diversity — every suggestion from a different world cuisine region'
+  ]));
+
+  // PROTEIN FOCUS (0=plant-forward, 10=meat-forward)
+  lines.push('Protein lean: ' + pick('protein', [
+    'Fully plant-based — all 3 suggestions must use only plant proteins (tofu, legumes, etc.), no meat',
+    'Almost plant-based — at most 1 of 3 suggestions may include meat',
+    'Plant-forward — 2 of 3 suggestions plant-based, 1 may include meat',
+    'Plant-leaning — at least 1 of 3 suggestions plant-based, lighter meats preferred',
+    'Balanced — roughly equal plant and meat options, no strong lean',
+    'Slightly meat-forward — meat proteins acceptable in most dishes, 1 plant option ideal',
+    'Meat-forward — at least 2 of 3 suggestions should feature a meat protein',
+    'Strongly meat-forward — hearty meat proteins in all 3 suggestions, veg option still present',
+    'Very meat-forward — protein-heavy dishes, meat as the centerpiece in every suggestion',
+    'Almost all meat — only include plant option if station requires it',
+    'All meat proteins — every suggestion built around a meat or seafood protein'
+  ]));
+
+  // DISH COMPLEXITY (0=simple, 10=chef-driven)
+  lines.push('Dish complexity: ' + pick('complex', [
+    'Absolute simplicity — 3 ingredients or fewer per dish, minimal technique',
+    'Very simple — quick-cook, minimal prep, basic techniques only',
+    'Simple — straightforward recipes achievable by any line cook in under 30 min',
+    'Mostly simple — one moderately complex dish per 3 acceptable',
+    'Moderate — mix of simple and more involved preparations',
+    'Somewhat complex — multi-component dishes acceptable, varied techniques',
+    'Complex-leaning — at least 2 of 3 suggestions involve multiple components or techniques',
+    'Chef-driven — sophisticated preparations, layered flavors, multiple components',
+    'Very chef-driven — dishes that showcase culinary skill and creativity',
+    'Highly technical — advanced techniques, restaurant-quality execution required',
+    'Maximum complexity — dishes that require experienced chef-level execution throughout'
+  ]));
+
+  // PORTION SIZE (0=light, 10=generous)
+  lines.push('Portion size: ' + pick('portion', [
+    'Very light — snack-sized portions, appetizer scale',
+    'Light — modest portions, appropriate for light eaters',
+    'Slightly under standard — lean portions, not filling for hungry diners',
+    'Just under standard — slightly light but satisfying for most',
+    'Standard — normal restaurant-sized portions',
+    'Slightly generous — a bit more than standard, satisfying for active students',
+    'Generous — noticeably filling, students will leave satisfied',
+    'Very generous — hearty servings, appropriate for high-activity populations',
+    'Large portions — substantial servings, built to fill up hungry college students',
+    'Very large — oversized portions, every dish should feel abundant',
+    'Maximum portions — the most filling, substantial dishes possible'
+  ]));
+
+  // INGREDIENT QUALITY (0=budget, 10=premium)
+  lines.push('Ingredient quality: ' + pick('premium', [
+    'Strictly budget — use the most cost-effective proteins and produce available',
+    'Very budget-conscious — prioritize cost savings in every ingredient choice',
+    'Budget-first — choose value options, avoid anything above mid-range cost',
+    'Cost-aware — lean toward economical ingredients, occasional quality upgrade fine',
+    'Slightly cost-aware — standard ingredients, quality upgrade only when it meaningfully improves the dish',
+    'True neutral — no lean toward budget or premium, choose whatever best serves the dish',
+    'Slightly quality-forward — prefer quality when it does not significantly raise cost',
+    'Quality-conscious — choose better-quality ingredients when meaningful to the dish',
+    'Quality-forward — use high-quality proteins and produce as the default',
+    'Premium — choose best-available ingredients, cost secondary to quality',
+    'Very premium — source quality ingredients throughout, no compromises',
+    'Maximum quality — use the finest available ingredients for every component'
+  ]));
+
+  // MENU VARIETY (0=consistent/familiar, 10=adventurous)
+  lines.push('Menu variety: ' + pick('variety', [
+    'Fully consistent — repeat familiar favorites, no surprises, students know exactly what to expect',
+    'Very consistent — stick to proven dishes, minimal variation',
+    'Mostly consistent — 1 novel dish per 3 acceptable alongside familiar options',
+    'Familiar-leaning — recognizable dishes with minor creative variations',
+    'Balanced — mix of reliable favorites and new options',
+    'Slightly adventurous — at least 1 of 3 suggestions introduces an unfamiliar flavor',
+    'Adventurous-leaning — at least 2 of 3 suggestions offer something unexpected',
+    'Adventurous — all suggestions should push beyond the expected, novel flavor profiles',
+    'Very adventurous — bold, unexpected combinations, challenge the palate',
+    'Highly adventurous — dishes students have likely never tried, maximum novelty',
+    'Maximum adventurousness — every dish should be surprising, boundary-pushing'
+  ]));
+
+  // Budget + premium protein constraints (unchanged)
   const targetCPM = calcTargetCostPerMeal();
   const premFreq = s.premfreq ?? 2;
-  const maxPremium = document.getElementById('maxPremium')?.value || premFreq;
 
   if (targetCPM) {
     lines.push(`Food cost target: Aim for approximately $${targetCPM.toFixed(2)} food cost per serving. Choose ingredients and preparations that respect this budget. For reference, premium proteins cost roughly: salmon $8-12/lb, halibut $15-20/lb, sea bass $18-25/lb, scallops $20-30/lb, steak (ribeye/NY strip) $15-25/lb, lamb $12-18/lb, duck $8-12/lb, lobster/crab $20-40/lb. Budget proteins: chicken thighs $2-3/lb, ground beef $4-6/lb, pork shoulder $3-5/lb, eggs $0.30/each, legumes/tofu $1-3/lb.`);

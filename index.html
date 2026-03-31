@@ -472,7 +472,12 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
       <button class="pub-xbtn btn-png" onclick="exportPNG()">⬇ Download PNG</button>
       <button class="pub-xbtn btn-pdf" onclick="exportPDF()">⬇ Download PDF</button>
       <button class="pub-xbtn btn-word" onclick="exportWord()">⬇ Download Word Doc</button>
-      <div class="pub-note">PNG → WordPress · PDF → print · Word → edit</div>
+      <div style="border-top:1px solid #2A2520;margin-top:4px;padding-top:8px;display:flex;flex-direction:column;gap:6px;">
+        <div style="font-family:'DM Mono',monospace;font-size:0.52rem;letter-spacing:0.1em;text-transform:uppercase;color:#4A4540;">Shopping List</div>
+        <button class="pub-xbtn btn-pdf" onclick="generateShoppingList('pdf')" id="shopListPdfBtn">⬇ Shopping List PDF</button>
+        <button class="pub-xbtn btn-word" onclick="generateShoppingList('xlsx')" id="shopListXlsxBtn">⬇ Shopping List Excel</button>
+      </div>
+      <div style="font-family:'DM Mono',monospace;font-size:0.52rem;color:#4A4540;margin-top:2px;line-height:1.6;">PNG → WordPress · PDF → print · Word → edit</div>
       <button onclick="clearPublishData()" style="background:transparent;border:1px solid #3A3530;color:#8A8278;padding:8px;font-family:'DM Mono',monospace;font-size:0.56rem;letter-spacing:0.1em;text-transform:uppercase;border-radius:4px;cursor:pointer;margin-top:4px;transition:all 0.2s;" onmouseover="this.style.borderColor='#B84C27';this.style.color='#B84C27'" onmouseout="this.style.borderColor='#3A3530';this.style.color='#8A8278'">
         ✕ Clear This Week
       </button>
@@ -2291,8 +2296,21 @@ async function acceptItem(i) {
   card.classList.add('accepted');
   card.querySelector('.card-actions').innerHTML = `<div class="accepted-badge">✓ Added to menu</div>`;
 
-  // Push to staged items for this location+week
+  // If a dish already exists for this date+meal+station, remove it first
   const staged = getStagedItems();
+  const existingIdx = staged.findIndex(item =>
+    item.date === date && item.meal === selectedMeal && item.station === station
+  );
+  if (existingIdx !== -1) {
+    const existing = staged[existingIdx];
+    // Remove from build panel
+    if (existing._itemId) document.getElementById(existing._itemId)?.remove();
+    // Remove from BOH panel
+    if (existing._bohId) document.getElementById(existing._bohId)?.remove();
+    // Remove from staged array
+    staged.splice(existingIdx, 1);
+  }
+
   const acceptedCard = document.getElementById(`card-${i}`);
   const protein = acceptedCard?.dataset.protein||'';
   const cuisine = acceptedCard?.dataset.cuisine||'';
@@ -2525,8 +2543,9 @@ function renderMenuCard() {
         <div style="width:${m.cp}%;background:#C9973A;"></div>
         <div style="width:${m.fp}%;background:#B84C27;"></div>
       </div>
-      <div style="font-family:'DM Mono',monospace;font-size:0.46rem;color:#8A8278;letter-spacing:0.04em;">
-        ${m.p}g P · ${m.c}g C · ${m.f}g F · ${m.cal} cal
+      <div style="font-family:'DM Mono',monospace;font-size:0.46rem;color:#8A8278;letter-spacing:0.04em;line-height:1.6;">
+        <div>${m.p}g protein · ${m.c}g carbs · ${m.f}g fat</div>
+        <div>${m.cal} cal / serving</div>
       </div>
     </div>`;
   }
@@ -2737,6 +2756,134 @@ function renderFinalBohSheet() {
     list.appendChild(card);
   });
 }
+
+// ═══════════════════════════
+// SHOPPING LIST
+// ═══════════════════════════
+async function generateShoppingList(format) {
+  const btn = document.getElementById(format === 'pdf' ? 'shopListPdfBtn' : 'shopListXlsxBtn');
+  const origText = btn.textContent;
+  btn.textContent = '⏳ Generating…'; btn.disabled = true;
+
+  // Collect all BOH ingredient strings from finalBohData for this loc+week
+  const items = getFinalBoh();
+  if (!items.length) {
+    alert('No finalized BOH notes found. Click Send to Publish first, then try again.');
+    btn.textContent = origText; btn.disabled = false; return;
+  }
+
+  const allIngredients = [];
+  items.forEach(item => {
+    (item.bohData?.ingredients || []).forEach(ing => {
+      allIngredients.push(`[${item.name}] ${ing}`);
+    });
+  });
+
+  if (!allIngredients.length) {
+    alert('No ingredient data found in BOH notes.');
+    btn.textContent = origText; btn.disabled = false; return;
+  }
+
+  const loc = getLoc(); const wk = getWeekKey();
+
+  const prompt = `You are a professional kitchen manager. Below is a list of ingredients from multiple dishes on a weekly menu. Each line is prefixed with the dish name in brackets.
+
+Ingredients:
+${allIngredients.join('\n')}
+
+Your job:
+1. Parse every ingredient line, extracting the item name and quantity
+2. Merge duplicate ingredients across dishes — convert to consistent units before merging (e.g. "2 cups" + "1 pint" = "4 cups"; "1 lb" + "8 oz" = "1.5 lbs"). When units can't be merged (e.g. "3 cloves" vs "2 tbsp minced"), keep the larger/more useful unit and note the conversion
+3. Categorize every ingredient into exactly one of these categories: Proteins, Dairy & Eggs, Produce, Grains Pasta & Bread, Pantry & Spices, Fresh Herbs, Other
+4. Within each category, alphabetize ingredients
+5. Round quantities to practical amounts (e.g. 2.5 lbs not 2.47 lbs)
+
+Respond ONLY with valid JSON:
+{
+  "categories": [
+    {
+      "name": "Proteins",
+      "items": [{"ingredient": "Chicken thighs", "quantity": "12 lbs"}, ...]
+    },
+    ...
+  ]
+}
+Include only categories that have at least one item. Use these exact category names: Proteins, Dairy & Eggs, Produce, Grains Pasta & Bread, Pantry & Spices, Fresh Herbs, Other.`;
+
+  try {
+    const text = await callClaude(prompt, 2000);
+    const data = JSON.parse(text);
+    if (format === 'pdf') {
+      exportShoppingListPDF(data, loc, wk);
+    } else {
+      exportShoppingListXLSX(data, loc, wk);
+    }
+  } catch(e) {
+    alert('Error generating shopping list: ' + e.message);
+  } finally {
+    btn.textContent = origText; btn.disabled = false;
+  }
+}
+
+function exportShoppingListPDF(data, loc, wk) {
+  const styles = Array.from(document.querySelectorAll('style')).map(s=>s.innerHTML).join(' ');
+  const categoriesHTML = data.categories.map(cat => `
+    <div style="margin-bottom:20px;break-inside:avoid;">
+      <div style="font-family:'DM Mono',sans-serif;font-size:0.58rem;letter-spacing:0.14em;text-transform:uppercase;color:#B84C27;margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid #B84C27;">${cat.name}</div>
+      <table style="width:100%;border-collapse:collapse;">
+        ${cat.items.map((item,i) => `
+          <tr style="background:${i%2===0?'#F7F3EC':'#fff'};">
+            <td style="padding:5px 8px;font-family:'DM Sans',sans-serif;font-size:0.82rem;color:#1A1714;">${item.ingredient}</td>
+            <td style="padding:5px 8px;font-family:'DM Mono',sans-serif;font-size:0.78rem;color:#4A4540;text-align:right;white-space:nowrap;">${item.quantity}</td>
+          </tr>`).join('')}
+      </table>
+    </div>`).join('');
+
+  const totalItems = data.categories.reduce((sum,c)=>sum+c.items.length,0);
+  const win = window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html><head>
+    <title>Shopping List — ${loc} ${weekLabel(wk)}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+      body{margin:0;padding:24px 32px;font-family:'DM Sans',sans-serif;background:#fff;color:#1A1714;}
+      @page{size:portrait;margin:0.4in;}
+      @media print{button{display:none;}}
+    </style></head><body>
+    <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:20px;padding-bottom:12px;border-bottom:3px solid #1A1714;">
+      <div>
+        <div style="font-family:'Playfair Display',serif;font-size:1.4rem;color:#1A1714;">${loc} <span style="color:#C9973A;font-style:italic;">Kitchen</span></div>
+        <div style="font-family:'DM Mono',sans-serif;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:#8A8278;margin-top:2px;">Weekly Shopping List</div>
+      </div>
+      <div style="text-align:right;font-family:'DM Mono',sans-serif;font-size:0.58rem;color:#8A8278;line-height:1.8;">
+        ${weekLabel(wk)}<br>${totalItems} items across ${data.categories.length} categories
+      </div>
+    </div>
+    <div style="columns:2;column-gap:24px;">${categoriesHTML}</div>
+  </body></html>`);
+  win.document.close();
+  setTimeout(()=>{ win.focus(); win.print(); win.close(); }, 900);
+}
+
+function exportShoppingListXLSX(data, loc, wk) {
+  const wb = XLSX.utils.book_new();
+  const rows = [
+    [`${loc} — Weekly Shopping List — ${weekLabel(wk)}`],
+    [],
+    ['Category', 'Ingredient', 'Quantity']
+  ];
+  data.categories.forEach(cat => {
+    cat.items.forEach(item => {
+      rows.push([cat.name, item.ingredient, item.quantity]);
+    });
+    rows.push([]); // blank row between categories
+  });
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  // Column widths
+  ws['!cols'] = [{wch:22},{wch:32},{wch:16}];
+  XLSX.utils.book_append_sheet(wb, ws, 'Shopping List');
+  XLSX.writeFile(wb, `ShoppingList_${loc.replace(/\s/g,'_')}_${wk}.xlsx`);
+}
+
 
 function exportBohPDF() {
   const items = getFinalBoh();
@@ -3202,5 +3349,6 @@ function renderKpiResults() {
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://unpkg.com/docx@9.5.3/build/index.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </body>
 </html>

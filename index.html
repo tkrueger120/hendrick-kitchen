@@ -2763,6 +2763,18 @@ function renderFinalBohSheet() {
 async function generateShoppingList(format) {
   const btn = document.getElementById(format === 'pdf' ? 'shopListPdfBtn' : 'shopListXlsxBtn');
   const origText = btn.textContent;
+
+  // Open the window immediately (must be synchronous from user click)
+  // before any async calls, otherwise browsers block it as a popup
+  if (format === 'pdf') {
+    window._shoppingListWin = window.open('', '_blank');
+    if (!window._shoppingListWin) {
+      alert('Popup blocked. Please allow popups for this site and try again.');
+      return;
+    }
+    window._shoppingListWin.document.write('<html><body style="font-family:sans-serif;padding:40px;color:#888;">⏳ Generating shopping list…</body></html>');
+  }
+
   btn.textContent = '⏳ Generating…'; btn.disabled = true;
 
   // Collect all BOH ingredient strings from finalBohData for this loc+week
@@ -2826,7 +2838,6 @@ Include only categories that have at least one item. Use these exact category na
 }
 
 function exportShoppingListPDF(data, loc, wk) {
-  const styles = Array.from(document.querySelectorAll('style')).map(s=>s.innerHTML).join(' ');
   const categoriesHTML = data.categories.map(cat => `
     <div style="margin-bottom:20px;break-inside:avoid;">
       <div style="font-family:'DM Mono',sans-serif;font-size:0.58rem;letter-spacing:0.14em;text-transform:uppercase;color:#B84C27;margin-bottom:8px;padding-bottom:4px;border-bottom:2px solid #B84C27;">${cat.name}</div>
@@ -2840,7 +2851,9 @@ function exportShoppingListPDF(data, loc, wk) {
     </div>`).join('');
 
   const totalItems = data.categories.reduce((sum,c)=>sum+c.items.length,0);
-  const win = window.open('','_blank');
+  // win was already opened before the async call — just write to it now
+  const win = window._shoppingListWin;
+  if (!win) { alert('Popup was blocked. Please allow popups for this site and try again.'); return; }
   win.document.write(`<!DOCTYPE html><html><head>
     <title>Shopping List — ${loc} ${weekLabel(wk)}</title>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
@@ -2861,7 +2874,8 @@ function exportShoppingListPDF(data, loc, wk) {
     <div style="columns:2;column-gap:24px;">${categoriesHTML}</div>
   </body></html>`);
   win.document.close();
-  setTimeout(()=>{ win.focus(); win.print(); win.close(); }, 900);
+  setTimeout(()=>{ win.focus(); win.print(); }, 900);
+  window._shoppingListWin = null;
 }
 
 function exportShoppingListXLSX(data, loc, wk) {

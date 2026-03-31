@@ -356,7 +356,7 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
     <button class="tab-btn" onclick="switchTab('kpi')" id="tabBtnKpi">
       Analyze <span class="tab-badge" id="kpiBadge">0</span>
     </button>
-    <button class="tab-btn" onclick="switchTab('style')" id="tabBtnStyle">Style</button>
+    <button class="tab-btn" onclick="switchTab('style')" id="tabBtnStyle">House Profile</button>
   </div>
   <div class="header-right">
     <div id="chefNameDisplay" style="font-family:'DM Mono',monospace;font-size:0.58rem;color:var(--gold);letter-spacing:0.08em;padding:0 4px;"></div>
@@ -508,27 +508,9 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
       <div class="kpi-import-notice" id="kpiImportNotice">No dishes imported yet.<br>Accept dishes in Build tab first.</div>
       <div id="kpiDishList" class="kpi-dish-list"></div>
       <button class="gen-btn" style="margin-top:16px;" onclick="runKpiAnalysis()">Analyze All Dishes →</button>
-      <div class="kpi-assumption-box" id="assumptionBox">
-        <div id="hhAssumptions">
-          <div class="panel-label" style="margin-bottom:10px;">Hendrick House Assumptions</div>
-          <div class="kpi-assume-grid">
-            <div class="kpi-assume-row"><span>Weekday Breakfast</span><input class="kpi-assume-input" id="asmBkfst" type="number" value="150"> customers</div>
-            <div class="kpi-assume-row"><span>Weekday Lunch</span><input class="kpi-assume-input" id="asmLunch" type="number" value="220"> customers</div>
-            <div class="kpi-assume-row"><span>Weekday Dinner</span><input class="kpi-assume-input" id="asmDinner" type="number" value="220"> customers</div>
-            <div class="kpi-assume-row"><span>Homestyle visit %</span><input class="kpi-assume-input" id="asmHS" type="number" value="60">%</div>
-            <div class="kpi-assume-row"><span>Veggie Life visit %</span><input class="kpi-assume-input" id="asmVL" type="number" value="50">%</div>
-            <div class="kpi-assume-row"><span>Sizzle visit %</span><input class="kpi-assume-input" id="asmSZ" type="number" value="40">%</div>
-            <div class="kpi-assume-row"><span>Pizza visit %</span><input class="kpi-assume-input" id="asmPZ" type="number" value="50">%</div>
-          </div>
-        </div>
-        <div id="greekAssumptions" style="display:none;">
-          <div class="panel-label" style="margin-bottom:10px;" id="greekAssumptionTitle">House Headcount</div>
-          <div class="kpi-assume-grid">
-            <div class="kpi-assume-row"><span>Breakfast</span><input class="kpi-assume-input" id="asmGreekBkfst" type="number" value="35"> members</div>
-            <div class="kpi-assume-row"><span>Lunch</span><input class="kpi-assume-input" id="asmGreekLunch" type="number" value="40"> members</div>
-            <div class="kpi-assume-row"><span>Dinner</span><input class="kpi-assume-input" id="asmGreekDinner" type="number" value="40"> members</div>
-          </div>
-          <div style="font-family:'DM Mono',monospace;font-size:0.52rem;color:#4A4540;margin-top:8px;line-height:1.6;">Greek houses: all members served at each station — no visit % split applied.</div>
+      <div style="background:#1A1714;border:1px solid #2A2520;border-radius:5px;padding:12px 14px;margin-top:8px;">
+        <div style="font-family:'DM Mono',monospace;font-size:0.56rem;color:#8A8278;line-height:1.7;">
+          Headcount settings have moved to the <strong style="color:var(--gold);">House Profile</strong> tab.
         </div>
       </div>
     </div>
@@ -551,9 +533,9 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
   <div class="style-layout">
 
     <div class="style-left">
-      <div class="panel-label" style="color:var(--warm-gray);margin-bottom:6px;">AI Recipe Style</div>
+      <div class="panel-label" style="color:var(--warm-gray);margin-bottom:6px;">House Profile</div>
       <div style="font-family:'DM Mono',monospace;font-size:0.56rem;color:#4A4540;line-height:1.7;margin-bottom:18px;">
-        These settings shape every suggestion the AI generates. Adjust per location — settings are saved automatically.
+        Configure your house settings, headcount, and AI flavor preferences. Saved per location automatically.
       </div>
 
       <div class="panel-label" style="margin-bottom:8px;">Location</div>
@@ -581,13 +563,51 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
             <input type="number" id="maxPremium" min="0" max="14" value="3"
               style="width:56px;background:#2A2520;border:1px solid #3A3530;color:var(--cream);padding:8px 10px;font-family:'DM Mono',monospace;font-size:0.82rem;border-radius:4px;outline:none;text-align:center;transition:border-color 0.2s;"
               onfocus="this.style.borderColor='var(--gold)'" onblur="this.style.borderColor='#3A3530'">
-            <span style="font-family:'DM Mono',monospace;font-size:0.56rem;color:#4A4540;line-height:1.6;">dishes with premium proteins (salmon, steak, shrimp, lamb…)</span>
+            <span style="font-family:'DM Mono',monospace;font-size:0.56rem;color:#4A4540;line-height:1.6;">dishes with premium proteins (salmon, steak, shrimp, scallops, lamb…)</span>
           </div>
         </div>
 
         <div style="font-family:'DM Mono',monospace;font-size:0.52rem;color:#4A4540;line-height:1.6;">
           Budget and premium limits feed directly into AI suggestions on the Build tab.
         </div>
+      </div>
+
+      <!-- HEADCOUNT SECTION -->
+      <div style="background:#1A1714;border:1px solid #2A2520;border-radius:6px;padding:16px 14px;display:flex;flex-direction:column;gap:10px;">
+        <div class="panel-label" style="color:var(--gold);margin-bottom:0;">Headcount & Dietary</div>
+
+        <!-- HH headcount -->
+        <div id="hpHHAssumptions">
+          <div class="panel-label" style="margin-bottom:8px;font-size:0.52rem;">Hendrick House — Daily Covers</div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div class="kpi-assume-row"><span>Breakfast</span><input class="kpi-assume-input" id="asmBkfst" type="number" value="150"> customers</div>
+            <div class="kpi-assume-row"><span>Lunch</span><input class="kpi-assume-input" id="asmLunch" type="number" value="220"> customers</div>
+            <div class="kpi-assume-row"><span>Dinner</span><input class="kpi-assume-input" id="asmDinner" type="number" value="220"> customers</div>
+            <div class="kpi-assume-row"><span>Homestyle %</span><input class="kpi-assume-input" id="asmHS" type="number" value="60">%</div>
+            <div class="kpi-assume-row"><span>Veggie Life %</span><input class="kpi-assume-input" id="asmVL" type="number" value="50">%</div>
+            <div class="kpi-assume-row"><span>Sizzle %</span><input class="kpi-assume-input" id="asmSZ" type="number" value="40">%</div>
+            <div class="kpi-assume-row"><span>Pizza %</span><input class="kpi-assume-input" id="asmPZ" type="number" value="50">%</div>
+          </div>
+        </div>
+
+        <!-- Greek headcount + dietary -->
+        <div id="hpGreekAssumptions" style="display:none;">
+          <div class="panel-label" style="margin-bottom:8px;font-size:0.52rem;" id="hpGreekTitle">House Headcount</div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div class="kpi-assume-row"><span>Lunch members</span><input class="kpi-assume-input" id="asmGreekLunch" type="number" value="40"></div>
+            <div class="kpi-assume-row"><span>Dinner members</span><input class="kpi-assume-input" id="asmGreekDinner" type="number" value="40"></div>
+            <div class="kpi-assume-row"><span>Breakfast members</span><input class="kpi-assume-input" id="asmGreekBkfst" type="number" value="35"></div>
+          </div>
+          <div style="border-top:1px solid #2A2520;margin-top:10px;padding-top:10px;">
+            <div class="panel-label" style="margin-bottom:8px;font-size:0.52rem;">Dietary Restrictions</div>
+            <div style="display:flex;flex-direction:column;gap:6px;">
+              <div class="kpi-assume-row"><span>Vegetarians</span><input class="kpi-assume-input" id="asmGreekVeg" type="number" value="0" oninput="saveCurrentSession()"> members</div>
+              <div class="kpi-assume-row"><span>Vegans</span><input class="kpi-assume-input" id="asmGreekVegan" type="number" value="0" oninput="saveCurrentSession()"> members</div>
+            </div>
+            <div style="font-family:'DM Mono',monospace;font-size:0.5rem;color:#4A4540;margin-top:6px;line-height:1.6;">BOH notes will include a dietary alternative when members above are &gt; 0.</div>
+          </div>
+        </div>
+
       </div>
 
       <div style="margin-top:20px;padding-top:16px;border-top:1px solid #2A2520;">
@@ -855,7 +875,7 @@ function getStylePrompt(loc) {
     lines.push(`Food cost target: Aim for approximately $${targetCPM.toFixed(2)} food cost per serving. Choose ingredients and preparations that respect this budget. For reference, premium proteins cost roughly: salmon $8-12/lb, halibut $15-20/lb, sea bass $18-25/lb, scallops $20-30/lb, steak (ribeye/NY strip) $15-25/lb, lamb $12-18/lb, duck $8-12/lb, lobster/crab $20-40/lb. Budget proteins: chicken thighs $2-3/lb, ground beef $4-6/lb, pork shoulder $3-5/lb, eggs $0.30/each, legumes/tofu $1-3/lb.`);
   }
 
-  lines.push(`Premium protein frequency: Allow exactly ${premFreq}x premium protein dishes per week maximum. PREMIUM proteins are: steak (any cut), salmon, halibut, sea bass, scallops, lobster, crab, lamb, duck. All other proteins (chicken, ground beef, pork, turkey, eggs, tofu, legumes, tilapia, pollock, shrimp in small quantities) are standard. For this specific suggestion, only suggest a premium protein if the weekly budget of ${premFreq} hasn't been filled yet — otherwise default to standard proteins.`);
+  lines.push(`Premium protein frequency: Allow exactly ${premFreq}x premium protein dishes per week maximum. PREMIUM proteins are: steak (any cut), salmon, halibut, sea bass, scallops, lobster, crab, lamb, duck, shrimp. All other proteins (chicken, ground beef, pork, turkey, eggs, tofu, legumes, tilapia, pollock) are standard. For this specific suggestion, only suggest a premium protein if the weekly budget of ${premFreq} hasn't been filled yet — otherwise default to standard proteins.`);
 
   return `\nStyle preferences for this location:\n${lines.join('\n')}`;
 }
@@ -867,7 +887,7 @@ function calcTargetCostPerMeal() {
   const greek = isGreekHouse(loc);
   let totalMeals = 0;
   if (greek) {
-    // Greek: 10 meals per week (3 lunches + 5 dinners) × headcount
+    // Greek: 10 meals per week (5 lunches Mon-Fri + 5 dinners Mon-Thu+Sun) × headcount
     const lunchCount = parseFloat(document.getElementById('asmGreekLunch')?.value)||40;
     const dinnerCount = parseFloat(document.getElementById('asmGreekDinner')?.value)||40;
     totalMeals = (3 * lunchCount) + (5 * dinnerCount);
@@ -1236,6 +1256,12 @@ function saveCurrentSession() {
   data.manualKpiValues = manualKpiValues;
   data.weeklyBudget = document.getElementById('weeklyBudget')?.value||'';
   data.maxPremium = document.getElementById('maxPremium')?.value||'3';
+  data.asmGreekVeg = document.getElementById('asmGreekVeg')?.value||'0';
+  data.asmGreekVegan = document.getElementById('asmGreekVegan')?.value||'0';
+  // Save all headcount fields
+  ['asmBkfst','asmLunch','asmDinner','asmHS','asmVL','asmSZ','asmPZ','asmGreekBkfst','asmGreekLunch','asmGreekDinner'].forEach(id => {
+    const el = document.getElementById(id); if (el) data[id] = el.value;
+  });
   saveChefData(currentChef, data);
 }
 
@@ -1292,6 +1318,12 @@ function loadChefSession(name) {
   if (data.maxPremium && document.getElementById('maxPremium')) {
     document.getElementById('maxPremium').value = data.maxPremium;
   }
+  if (data.asmGreekVeg && document.getElementById('asmGreekVeg')) document.getElementById('asmGreekVeg').value = data.asmGreekVeg;
+  if (data.asmGreekVegan && document.getElementById('asmGreekVegan')) document.getElementById('asmGreekVegan').value = data.asmGreekVegan;
+  // Restore headcount fields
+  ['asmBkfst','asmLunch','asmDinner','asmHS','asmVL','asmSZ','asmPZ','asmGreekBkfst','asmGreekLunch','asmGreekDinner'].forEach(id => {
+    if (data[id] && document.getElementById(id)) document.getElementById(id).value = data[id];
+  });
   renderWeekSelector();
   syncAcceptedFromStaged();
   const container = document.getElementById('pubDayList');
@@ -1507,8 +1539,17 @@ document.querySelectorAll('[data-meal]').forEach(btn => {
     document.querySelectorAll('[data-meal]').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active'); selectedMeal = btn.dataset.meal;
     const sg = document.getElementById('stationGrid');
-    if (selectedMeal==='Breakfast') { sg.style.opacity='0.35'; sg.style.pointerEvents='none'; selectedStation='Breakfast'; }
-    else { sg.style.opacity='1'; sg.style.pointerEvents='auto'; if(selectedStation==='Breakfast'){selectedStation='Homestyle';document.querySelector('[data-station="Homestyle"]').classList.add('active');} }
+    if (selectedMeal==='Breakfast') {
+      sg.style.opacity='0.35'; sg.style.pointerEvents='none'; selectedStation='Breakfast';
+    } else {
+      sg.style.opacity='1'; sg.style.pointerEvents='auto';
+      if (selectedStation==='Breakfast') {
+        // Clear ALL station active states first, then set Homestyle
+        document.querySelectorAll('[data-station]').forEach(b=>b.classList.remove('active'));
+        selectedStation='Homestyle';
+        document.querySelector('[data-station="Homestyle"]').classList.add('active');
+      }
+    }
     updateContextPill();
   });
 });
@@ -1692,17 +1733,25 @@ FLAVOR PROFILE:
         ? `\nHomestyle dishes tonight: ${homestyle.map(i=>i.name).join(', ')}\nAim for ~50% ingredient/spice profile overlap with Homestyle. For example if Homestyle has chicken tikka masala, a great Veg Life option is paneer tikka masala OR a different dish using similar spices (cumin, coriander, garam masala). Don't always do the identical dish — vary it 50% of the time.`
         : '';
 
-      audienceNote = `Hendrick House residential dining hall — Veggie Life station. 100% VEGETARIAN (no meat, no poultry, no seafood — eggs and dairy are fine).
+      audienceNote = `Hendrick House residential dining hall — Veggie Life station. STRICT VEGETARIAN ONLY.
+
+ABSOLUTE PROTEIN EXCLUSIONS — never suggest any of these under any circumstances:
+- NO chicken, beef, pork, lamb, turkey, duck, or any land meat
+- NO fish of any kind (salmon, tuna, tilapia, cod, halibut, etc.)
+- NO shellfish or seafood of any kind (shrimp, crab, lobster, scallops, clams, mussels, etc.)
+- Eggs and dairy (cheese, paneer, yogurt, cream) ARE allowed
+
+APPROVED PROTEINS — use only these:
+Paneer, tofu, tempeh, seitan, eggs, chickpeas, lentils, black beans, kidney beans, edamame, halloumi, ricotta, mozzarella, feta, nuts/seeds as protein, quinoa
 
 CORE RULES:
 - Must be genuinely exciting — not an afterthought or a sad salad
-- Aim for ~50% spice/ingredient overlap with whatever is at Homestyle tonight (purchasing efficiency + cohesive menu feel)
-- Occasionally it's perfect to do a direct vegetarian version (e.g. paneer instead of chicken), but vary it — don't do this every night
-- Budget-conscious: no expensive proteins. Lean on paneer, tofu, beans, lentils, chickpeas, eggs, hearty vegetables
-- Students especially love: paneer dishes, tofu preparations, bean-based mains, stuffed vegetables, grain bowls
-- Do NOT repeat the same protein (paneer, tofu, beans) on consecutive nights or more than twice in a week
-- Health-forward but still satisfying and well-flavored — should feel like a restaurant-quality vegetarian dish, not diet food
-- Large-batch cooking constraints apply here too (oven, braise, simmer — not individual portions)${homestyle.length > 0 ? homestyleContext : ingredientContext}`;
+- Aim for ~50% spice/ingredient overlap with whatever is at Homestyle tonight
+- Occasionally do a direct vegetarian version (e.g. paneer instead of chicken) but vary it
+- Budget-conscious: lean on legumes, tofu, paneer, eggs — not expensive ingredients
+- Health-forward but satisfying and well-flavored
+- Do NOT repeat the same protein on consecutive nights or more than twice in a week
+- Large-batch cooking constraints apply (oven, braise, simmer — not individual portions)${homestyle.length > 0 ? homestyleContext : ingredientContext}`;
 
     } else if (station === 'Sizzle') {
       // Find other station dishes tonight for "special that plays on other ingredients"
@@ -1763,10 +1812,43 @@ Generate 3 featured pizza options.${recycleContext}`;
     }
   }
 
-  // ── Already accepted this week — for diversity enforcement ──
+  // ── Build diversity data from accepted items ──
+  // Build protein frequency map for rotation rule
+  const proteinFreqAll = {};   // protein -> total count this week
+  const proteinFreqLunch = {}; // protein -> lunch count
+  const proteinFreqDinner = {}; // protein -> dinner count
+  const cuisinesByDay = {};    // dateStr -> [cuisines]
+  acceptedItems.filter(i => i.location === location).forEach(item => {
+    if (item._protein) {
+      const p = item._protein.toLowerCase();
+      proteinFreqAll[p] = (proteinFreqAll[p]||0) + 1;
+      if (item.meal === 'Lunch') proteinFreqLunch[p] = (proteinFreqLunch[p]||0) + 1;
+      if (item.meal === 'Dinner') proteinFreqDinner[p] = (proteinFreqDinner[p]||0) + 1;
+    }
+    if (item._cuisine && item.date) {
+      if (!cuisinesByDay[item.date]) cuisinesByDay[item.date] = [];
+      cuisinesByDay[item.date].push(item._cuisine);
+    }
+  });
+  const blockedProteins = Object.entries(proteinFreqAll).filter(([p,n])=>n>=3).map(([p])=>p);
+  const blockedLunchProteins = Object.entries(proteinFreqLunch).filter(([p,n])=>n>=2).map(([p])=>p);
+  const blockedDinnerProteins = Object.entries(proteinFreqDinner).filter(([p,n])=>n>=2).map(([p])=>p);
+
+  // Find cuisines used in the last 2 days before selected date
+  const selDate = getSelectedDayDate();
+  const recentCuisines = [];
+  if (selDate) {
+    const base = new Date(selDate+'T00:00:00');
+    for (let back=1; back<=2; back++) {
+      const d = new Date(base); d.setDate(base.getDate()-back);
+      const ds = d.toISOString().split('T')[0];
+      if (cuisinesByDay[ds]) recentCuisines.push(...cuisinesByDay[ds]);
+    }
+  }
+
   const alreadyAccepted = acceptedItems
     .filter(item => item.location === location)
-    .map(item => item.name);
+    .map(item => `${item.name}${item._cuisine?' ['+item._cuisine+']':''}${item._protein?' ('+item._protein+')':''}`);
 
   const diversityNote = alreadyAccepted.length > 0 ? `
 DIVERSITY & INGREDIENT-SHARING RULES — Already accepted this week for ${location}:
@@ -1774,11 +1856,15 @@ ${alreadyAccepted.map(n => `- ${n}`).join('\n')}
 
 STRICT RULES:
 1. FLAVOR DIVERSITY: Do NOT reuse the same flavor profile or spice blend already on the menu (e.g. if za'atar appears, no more za'atar this week; same for harissa, chimichurri, tikka, teriyaki, etc.)
-2. PROTEIN ROTATION: Do NOT use any protein that already appears more than once this week
+2. PROTEIN ROTATION (PER MEAL TYPE):
+   - These proteins are FULLY BLOCKED this week (used 3+ times total): ${blockedProteins.length ? blockedProteins.join(', ') : 'none yet'}
+   - These proteins are BLOCKED FOR LUNCH (used 2+ lunches): ${blockedLunchProteins.length ? blockedLunchProteins.join(', ') : 'none yet'}
+   - These proteins are BLOCKED FOR DINNER (used 2+ dinners): ${blockedDinnerProteins.length ? blockedDinnerProteins.join(', ') : 'none yet'}
+   - Current meal being planned: ${selectedMeal}
 3. TECHNIQUE VARIETY: Vary cooking techniques — avoid 3+ dishes using the same method
-4. CUISINE ROTATION: Vary cuisine regions day-to-day. Same cuisine at two stations on the same day is fine (cohesion), but avoid the same cuisine region 3+ days in a row
+4. CUISINE ROTATION: ${recentCuisines.length ? `The last 1-2 days featured: ${[...new Set(recentCuisines)].join(', ')}. Avoid these same cuisine regions today unless it is a different sub-cuisine.` : 'No recent pattern detected — vary freely.'}
 5. INGREDIENT EFFICIENCY: Where possible, suggest dishes that reuse ingredients already on the menu this week (purchasing efficiency) — but in a different flavor direction
-6. SAME-DAY COHESION: It's good if stations on the same day share ingredients or a loose flavor theme — this helps purchasing and creates a cohesive meal experience` : '';
+6. SAME-DAY COHESION: It's good if stations on the same day share ingredients or a loose flavor theme` : '';
 
   const greekMealNote = greek ? `This is a single unified ${selectedMeal} menu for the whole house — not broken into stations.` : '';
 
@@ -1807,8 +1893,9 @@ The 3 options MUST:
 - Avoid repeating any flavor profiles, spice blends, or cooking techniques
 - Feel genuinely exciting and different from each other
 
+For each option also identify: the primary protein (e.g. "chicken", "tofu", "salmon") and the cuisine region (one of: American, Italian, Mexican, Mediterranean, Middle Eastern, South Asian, East Asian, Southeast Asian, Latin American, African, French, Other).
 Respond ONLY with valid JSON:
-{"options":[{"name":"","desc":"","vegAlt":null},{"name":"","desc":"","vegAlt":null},{"name":"","desc":"","vegAlt":null}]}`;
+{"options":[{"name":"","desc":"","vegAlt":null,"protein":"","cuisine":""},{"name":"","desc":"","vegAlt":null,"protein":"","cuisine":""},{"name":"","desc":"","vegAlt":null,"protein":"","cuisine":""}]}`;
 
   try {
     const text = await callClaude(prompt, 1200);
@@ -1830,6 +1917,8 @@ function renderSuggestions(options, station) {
     card.dataset.station = station;
     card.dataset.originalName = opt.name;
     card.dataset.originalDesc = opt.desc;
+    card.dataset.protein = opt.protein||'';
+    card.dataset.cuisine = opt.cuisine||'';
     card.innerHTML=`
       <div class="dish-name">${opt.name}</div>
       ${opt.vegAlt?`<div class="dish-veg">🌱 ${opt.vegAlt}</div>`:''}
@@ -2039,7 +2128,10 @@ async function acceptItem(i) {
 
   // Push to staged items for this location+week
   const staged = getStagedItems();
-  staged.push({ date, meal:selectedMeal, station, name, desc, location });
+  const acceptedCard = document.getElementById(`card-${i}`);
+  const protein = acceptedCard?.dataset.protein||'';
+  const cuisine = acceptedCard?.dataset.cuisine||'';
+  staged.push({ date, meal:selectedMeal, station, name, desc, location, _protein:protein, _cuisine:cuisine });
   acceptedItems = staged;
   acceptedCount = staged.length;
   document.getElementById('acceptedCount').textContent = `${acceptedCount} item${acceptedCount!==1?'s':''} accepted`;
@@ -2089,7 +2181,8 @@ function renderBOH(id, name, d) {
     <div class="boh-sec">Prep & Cooking Steps</div>
     <ol class="boh-steps">${(d.steps||[]).map(s=>`<li>${s}</li>`).join('')}</ol>
     ${d.timing?`<div class="boh-sec">Key Timing</div><div class="boh-timing">${d.timing}</div>`:''}
-    ${(d.mistakes||[]).length?`<div class="boh-sec">Watch Out For</div><ul class="boh-list">${d.mistakes.map(m=>`<li>⚠ ${m}</li>`).join('')}</ul>`:''}`;
+    ${(d.mistakes||[]).length?`<div class="boh-sec">Watch Out For</div><ul class="boh-list">${d.mistakes.map(m=>`<li>⚠ ${m}</li>`).join('')}</ul>`:''}
+    ${d.dietaryAlt?`<div class="boh-sec" style="color:var(--sage);">🌱 Dietary Alternative</div><div class="boh-timing" style="color:var(--sage);">${d.dietaryAlt}</div>`:''}`;
   // Store BOH data on matching staged item so it survives to publish
   const staged = getStagedItems();
   const stagedItem = staged.find(i => i.name === name);
@@ -2107,13 +2200,25 @@ async function retryBOH(id, name, station, loc, btn) {
 
 async function generateBOH(name, desc, station, loc) {
   const size = getServingSize();
+  const isGreek = isGreekHouse(loc);
+  const vegCount = isGreek ? (parseInt(document.getElementById('asmGreekVeg')?.value)||0) : 0;
+  const veganCount = isGreek ? (parseInt(document.getElementById('asmGreekVegan')?.value)||0) : 0;
+  const dietaryTotal = vegCount + veganCount;
+  const meatSize = dietaryTotal > 0 ? size - dietaryTotal : size;
+
+  const dietaryNote = dietaryTotal > 0 ? `
+DIETARY NOTE: This house has ${vegCount > 0 ? vegCount + ' vegetarian' + (vegCount > 1 ? 's' : '') : ''}${vegCount > 0 && veganCount > 0 ? ' and ' : ''}${veganCount > 0 ? veganCount + ' vegan' + (veganCount > 1 ? 's' : '') : ''}. 
+Adjust the main protein ingredient quantity for ${meatSize} servings (not ${size}).
+Add a "dietaryAlt" field to the JSON: a brief note (1-2 sentences) describing the simplest possible alternative for the dietary members — keep it as close to the original dish as possible, just swap the protein. For vegans, also note any dairy/egg substitution needed. Since this is a small quantity (${dietaryTotal} serving${dietaryTotal>1?'s':''}), suggest the most practical same-spice-profile protein swap (e.g. if chicken tikka masala → paneer tikka masala for the same sauce, just ${dietaryTotal} serving${dietaryTotal>1?'s':''}).` : '';
+
   const prompt = `BOH kitchen reference for professional university dining chef.
-Dish: ${name} | ${desc} | Station: ${station} | Location: ${loc} (~${size} servings)
+Dish: ${name} | ${desc} | Station: ${station} | Location: ${loc} (~${size} servings total)
+${dietaryNote}
 Respond ONLY with valid JSON:
-{"ingredients":["item with quantity for ${size} servings"],"steps":["step"],"timing":"one sentence","mistakes":["dish-specific mistake"]}
-Requirements: 6-10 ingredients with realistic quantities for ${size} servings · 4-7 steps · 2-3 mistakes`;
+{"ingredients":["item with quantity"],"steps":["step"],"timing":"one sentence","mistakes":["dish-specific mistake"]${dietaryTotal > 0 ? ',"dietaryAlt":"brief description of veg/vegan alternative with adjusted quantities"' : ''}}
+Requirements: 6-10 ingredients with realistic quantities${dietaryTotal > 0 ? ` (main protein for ${meatSize}, not ${size})` : ` for ${size} servings`} · 4-7 steps · 2-3 mistakes`;
   try {
-    const text = await callClaude(prompt, 800);
+    const text = await callClaude(prompt, 900);
     return JSON.parse(text);
   } catch(e) { return {error:true, ingredients:[],steps:[],timing:'',mistakes:[]}; }
 }
@@ -2462,6 +2567,7 @@ function renderFinalBohSheet() {
         </div>
       </div>
       ${d.timing ? `<div style="margin-top:10px;padding-top:8px;border-top:1px solid #E8E2D9;font-family:'DM Mono',monospace;font-size:0.58rem;color:#8A8278;"><span style="color:#B84C27;text-transform:uppercase;letter-spacing:0.1em;font-size:0.5rem;">Timing · </span>${d.timing}</div>` : ''}
+      ${d.dietaryAlt ? `<div style="margin-top:8px;padding:8px 12px;background:#F0F5F0;border-radius:4px;"><span style="font-family:'DM Mono',monospace;font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;color:#4A6741;">🌱 Dietary Alt · </span><span style="font-size:0.74rem;color:#3A3530;">${d.dietaryAlt}</span></div>` : ''}
       ${(d.mistakes||[]).length ? `<div style="margin-top:8px;"><div style="font-family:'DM Mono',monospace;font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;color:#B84C27;margin-bottom:4px;">Watch Out For</div><ul style="margin:0;padding-left:16px;font-size:0.74rem;line-height:1.7;color:#8A8278;">${d.mistakes.map(m=>`<li>⚠ ${m}</li>`).join('')}</ul></div>` : ''}`;
     list.appendChild(card);
   });
@@ -2664,11 +2770,13 @@ function getKpiLocation() {
 function updateKpiLocation() {
   const loc = document.getElementById('masterLocation')?.value || '';
   const isGreek = GREEK_HOUSES.includes(loc);
-  document.getElementById('hhAssumptions').style.display = isGreek ? 'none' : 'block';
-  document.getElementById('greekAssumptions').style.display = isGreek ? 'block' : 'none';
-  if (isGreek) {
-    document.getElementById('greekAssumptionTitle').textContent = `${loc} Headcount`;
-  }
+  // Update House Profile headcount section visibility
+  const hpHH = document.getElementById('hpHHAssumptions');
+  const hpGr = document.getElementById('hpGreekAssumptions');
+  const hpGrTitle = document.getElementById('hpGreekTitle');
+  if (hpHH) hpHH.style.display = isGreek ? 'none' : 'block';
+  if (hpGr) hpGr.style.display = isGreek ? 'block' : 'none';
+  if (hpGrTitle && isGreek) hpGrTitle.textContent = `${loc} Headcount`;
   // Rebuild kpiDishes for new location
   populateKpiFromAccepted();
 }

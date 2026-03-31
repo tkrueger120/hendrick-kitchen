@@ -1841,7 +1841,10 @@ function renderSuggestions(options, station) {
       <div class="swap-zone" id="swap-${i}" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--mist);">
         <div style="font-family:'DM Mono',monospace;font-size:0.52rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--warm-gray);margin-bottom:6px;">Swap protein</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;" id="protein-btns-${i}">
-          ${['Chicken','Beef','Pork','Salmon','Shrimp','Tofu','Lamb','Turkey','Chickpeas','Eggs'].map(p =>
+          ${(station === 'Veggie Life'
+            ? ['Tofu','Paneer','Tempeh','Chickpeas','Lentils','Black Beans','Eggs','Halloumi','Seitan','Edamame']
+            : ['Chicken','Beef','Pork','Salmon','Shrimp','Tofu','Lamb','Turkey','Chickpeas','Eggs']
+          ).map(p =>
             `<button class="protein-opt" onclick="selectProtein(${i},'${p}')" data-protein="${p}">${p}</button>`
           ).join('')}
         </div>

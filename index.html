@@ -280,7 +280,7 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
   min-height:48px;
 }
 .mc-cell-name{font-family:'Playfair Display',serif;font-size:0.66rem;color:var(--ink);line-height:1.3;margin-bottom:2px;}
-.mc-cell-desc{font-size:0.56rem;color:var(--warm-gray);line-height:1.4;}
+.mc-cell-desc{font-size:0.56rem;color:#3A3530;line-height:1.4;}
 .mc-cell-empty{font-family:'DM Mono',monospace;font-size:0.44rem;color:#D8D0C8;font-style:italic;}
 
 /* Alternating station row tints */
@@ -291,7 +291,7 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
 
 /* Footer */
 .mc-footer{background:var(--ink);padding:11px 28px;display:flex;align-items:center;justify-content:space-between;}
-.mc-footer-text{font-family:'DM Mono',monospace;font-size:0.48rem;letter-spacing:0.09em;text-transform:uppercase;color:#4A4540;}
+.mc-footer-text{font-family:'DM Mono',monospace;font-size:0.58rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:#8A8278;}
 </style>
 </head>
 <body>
@@ -477,6 +477,10 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
         <button class="pub-xbtn btn-pdf" onclick="generateShoppingList('pdf')" id="shopListPdfBtn">⬇ Shopping List PDF</button>
         <button class="pub-xbtn btn-word" onclick="generateShoppingList('xlsx')" id="shopListXlsxBtn">⬇ Shopping List Excel</button>
       </div>
+      <div style="border-top:1px solid #2A2520;margin-top:4px;padding-top:8px;display:flex;flex-direction:column;gap:6px;">
+        <div style="font-family:'DM Mono',monospace;font-size:0.52rem;letter-spacing:0.1em;text-transform:uppercase;color:#4A4540;">Best Hits</div>
+        <button class="pub-xbtn btn-word" onclick="exportBestHitsXLSX()">⬇ Export Best Hits</button>
+      </div>
       <div style="font-family:'DM Mono',monospace;font-size:0.52rem;color:#4A4540;margin-top:2px;line-height:1.6;">PNG → WordPress · PDF → print · Word → edit</div>
       <button onclick="clearPublishData()" style="background:transparent;border:1px solid #3A3530;color:#8A8278;padding:8px;font-family:'DM Mono',monospace;font-size:0.56rem;letter-spacing:0.1em;text-transform:uppercase;border-radius:4px;cursor:pointer;margin-top:4px;transition:all 0.2s;" onmouseover="this.style.borderColor='#B84C27';this.style.color='#B84C27'" onmouseout="this.style.borderColor='#3A3530';this.style.color='#8A8278'">
         ✕ Clear This Week
@@ -499,6 +503,19 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
       </div>
       <div id="finalBohList"></div>
     </div>
+
+    <!-- RATE THIS WEEK -->
+    <div id="rateWeekSection" style="display:none;margin-top:28px;max-width:900px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <div>
+          <div class="pub-preview-label" style="margin-bottom:2px;">Rate This Week's Dishes</div>
+          <div style="font-family:'DM Mono',monospace;font-size:0.52rem;color:#8A8278;">4+ stars saves to Best Hits library · 5-star dishes are shared across all locations</div>
+        </div>
+        <button onclick="saveAllRatings()" class="pub-xbtn btn-word" style="margin:0;">Save Ratings</button>
+      </div>
+      <div id="ratingCardList" style="display:flex;flex-direction:column;gap:10px;"></div>
+    </div>
+
   </div>
 </div>
 
@@ -626,6 +643,77 @@ header{background:var(--ink);color:var(--cream);padding:0 36px;display:flex;alig
 
     <div class="style-right">
       <div class="style-grid" id="styleGrid"></div>
+
+      <!-- HOUSE RULES -->
+      <div style="margin-top:28px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+          <div>
+            <div style="font-family:'DM Mono',monospace;font-size:0.58rem;letter-spacing:0.14em;text-transform:uppercase;color:#4A4540;">House Rules</div>
+            <div style="font-family:'DM Mono',monospace;font-size:0.52rem;color:#8A8278;margin-top:3px;">Up to 5 rules per location · Applied to every suggestion</div>
+          </div>
+          <button onclick="showAddRuleForm()" id="addRuleBtn"
+            style="background:var(--ink);color:var(--cream);border:none;padding:7px 14px;font-family:'DM Mono',monospace;font-size:0.58rem;letter-spacing:0.08em;border-radius:4px;cursor:pointer;transition:opacity 0.2s;">
+            + Add Rule
+          </button>
+        </div>
+
+        <!-- Add rule form (hidden by default) -->
+        <div id="addRuleForm" style="display:none;background:#fff;border:1px solid var(--mist);border-radius:8px;padding:18px 20px;margin-bottom:16px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+            <div>
+              <div style="font-family:'DM Mono',monospace;font-size:0.52rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--warm-gray);margin-bottom:6px;">Rule Type</div>
+              <select id="ruleType" onchange="updateRuleFormFields()"
+                style="width:100%;background:var(--cream);border:1px solid var(--mist);color:var(--ink);padding:8px 10px;font-family:'DM Sans',sans-serif;font-size:0.82rem;border-radius:4px;outline:none;">
+                <option value="day_theme">Day-of-week theme</option>
+                <option value="frequency">Weekly frequency</option>
+                <option value="always_never">Always / Never</option>
+              </select>
+            </div>
+            <div id="ruleTriggerWrap">
+              <div style="font-family:'DM Mono',monospace;font-size:0.52rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--warm-gray);margin-bottom:6px;" id="ruleTriggerLabel">Day</div>
+              <select id="ruleTrigger"
+                style="width:100%;background:var(--cream);border:1px solid var(--mist);color:var(--ink);padding:8px 10px;font-family:'DM Sans',sans-serif;font-size:0.82rem;border-radius:4px;outline:none;">
+                <option value="Monday">Monday</option>
+                <option value="Tuesday">Tuesday</option>
+                <option value="Wednesday">Wednesday</option>
+                <option value="Thursday">Thursday</option>
+                <option value="Friday">Friday</option>
+                <option value="Saturday">Saturday</option>
+                <option value="Sunday">Sunday</option>
+              </select>
+            </div>
+          </div>
+          <div style="margin-bottom:12px;">
+            <div style="font-family:'DM Mono',monospace;font-size:0.52rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--warm-gray);margin-bottom:6px;" id="ruleActionLabel">Theme / cuisine</div>
+            <input type="text" id="ruleAction" placeholder="e.g. Mexican tacos and burritos"
+              style="width:100%;background:var(--cream);border:1px solid var(--mist);color:var(--ink);padding:8px 10px;font-family:'DM Sans',sans-serif;font-size:0.82rem;border-radius:4px;outline:none;">
+          </div>
+          <div style="margin-bottom:14px;" id="ruleMealWrap">
+            <div style="font-family:'DM Mono',monospace;font-size:0.52rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--warm-gray);margin-bottom:6px;">Applies to</div>
+            <select id="ruleMeal"
+              style="width:100%;background:var(--cream);border:1px solid var(--mist);color:var(--ink);padding:8px 10px;font-family:'DM Sans',sans-serif;font-size:0.82rem;border-radius:4px;outline:none;">
+              <option value="any">Any meal</option>
+              <option value="Lunch">Lunch only</option>
+              <option value="Dinner">Dinner only</option>
+              <option value="Breakfast">Breakfast only</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button onclick="saveRule()"
+              style="background:var(--rust);color:#fff;border:none;padding:8px 18px;font-family:'DM Mono',monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;border-radius:4px;cursor:pointer;">
+              Save Rule
+            </button>
+            <button onclick="hideAddRuleForm()"
+              style="background:transparent;border:1px solid var(--mist);color:var(--warm-gray);padding:8px 14px;font-family:'DM Mono',monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;border-radius:4px;cursor:pointer;">
+              Cancel
+            </button>
+          </div>
+        </div>
+
+        <!-- Existing rules list -->
+        <div id="rulesList"></div>
+      </div>
+
     </div>
 
   </div>
@@ -723,9 +811,10 @@ function getStyleSettings(loc) {
 }
 
 function loadStyleSettings() {
-  const loc = document.getElementById('styleLocation').value;
+  const loc = document.getElementById('masterLocation')?.value || document.getElementById('styleLocation')?.value || 'Hendrick House';
   const settings = getStyleSettings(loc);
   renderStyleGrid(loc, settings);
+  renderRulesList();
 }
 
 function renderStyleGrid(loc, settings) {
@@ -1099,11 +1188,171 @@ function updateBudgetCalcs() {
   }
 }
 
-// Init style tab on first load
+// ═══════════════════════════
+// HOUSE RULES
+// ═══════════════════════════
+// houseRules[location] = [{ type, trigger, action, meal, id }]
+// type: 'day_theme' | 'frequency' | 'always_never'
+let houseRules = {};
+
+function getHouseRules(loc) {
+  if (!houseRules[loc]) houseRules[loc] = [];
+  return houseRules[loc];
+}
+
+function showAddRuleForm() {
+  const loc = document.getElementById('masterLocation').value;
+  const rules = getHouseRules(loc);
+  if (rules.length >= 5) {
+    alert('Maximum 5 rules per location. Delete an existing rule to add a new one.');
+    return;
+  }
+  document.getElementById('addRuleForm').style.display = 'block';
+  document.getElementById('addRuleBtn').style.display = 'none';
+  document.getElementById('ruleAction').value = '';
+  updateRuleFormFields();
+}
+
+function hideAddRuleForm() {
+  document.getElementById('addRuleForm').style.display = 'none';
+  document.getElementById('addRuleBtn').style.display = 'block';
+}
+
+function updateRuleFormFields() {
+  const type = document.getElementById('ruleType').value;
+  const triggerWrap = document.getElementById('ruleTriggerWrap');
+  const triggerLabel = document.getElementById('ruleTriggerLabel');
+  const actionLabel = document.getElementById('ruleActionLabel');
+  const ruleMealWrap = document.getElementById('ruleMealWrap');
+  const triggerSel = document.getElementById('ruleTrigger');
+
+  if (type === 'day_theme') {
+    triggerLabel.textContent = 'Day';
+    triggerSel.innerHTML = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+      .map(d=>`<option value="${d}">${d}</option>`).join('');
+    actionLabel.textContent = 'Theme or cuisine';
+    document.getElementById('ruleAction').placeholder = 'e.g. Mexican tacos and burritos';
+    ruleMealWrap.style.display = 'block';
+    triggerWrap.style.display = 'block';
+  } else if (type === 'frequency') {
+    triggerLabel.textContent = 'Frequency';
+    triggerSel.innerHTML = ['At least 1x per week','At least 2x per week','At least 3x per week','At most 1x per week','At most 2x per week']
+      .map(d=>`<option value="${d}">${d}</option>`).join('');
+    actionLabel.textContent = 'What (dish type, cuisine, ingredient)';
+    document.getElementById('ruleAction').placeholder = 'e.g. pasta dishes, or vegetarian options, or soup';
+    ruleMealWrap.style.display = 'block';
+    triggerWrap.style.display = 'block';
+  } else if (type === 'always_never') {
+    triggerLabel.textContent = 'Condition';
+    triggerSel.innerHTML = ['Always','Never']
+      .map(d=>`<option value="${d}">${d}</option>`).join('');
+    actionLabel.textContent = 'What';
+    document.getElementById('ruleAction').placeholder = 'e.g. include a soup option on Fridays, or suggest beef';
+    ruleMealWrap.style.display = 'none';
+    triggerWrap.style.display = 'block';
+  }
+}
+
+function saveRule() {
+  const loc = document.getElementById('masterLocation').value;
+  const type = document.getElementById('ruleType').value;
+  const trigger = document.getElementById('ruleTrigger').value;
+  const action = document.getElementById('ruleAction').value.trim();
+  const meal = document.getElementById('ruleMeal')?.value || 'any';
+
+  if (!action) { document.getElementById('ruleAction').focus(); return; }
+
+  const rule = { type, trigger, action, meal, id: Date.now() };
+  getHouseRules(loc).push(rule);
+  if (currentChef) saveCurrentSession();
+  hideAddRuleForm();
+  renderRulesList();
+}
+
+function deleteRule(loc, id) {
+  houseRules[loc] = getHouseRules(loc).filter(r => r.id !== id);
+  if (currentChef) saveCurrentSession();
+  renderRulesList();
+}
+
+function renderRulesList() {
+  const loc = document.getElementById('masterLocation').value;
+  const rules = getHouseRules(loc);
+  const list = document.getElementById('rulesList');
+  if (!list) return;
+
+  if (!rules.length) {
+    list.innerHTML = `<div style="font-family:'DM Mono',monospace;font-size:0.58rem;color:#4A4540;text-align:center;padding:20px 0;border:1px dashed #D0C8BE;border-radius:6px;">No rules yet — click + Add Rule to create one</div>`;
+    return;
+  }
+
+  const typeLabels = { day_theme: 'Day Theme', frequency: 'Frequency', always_never: 'Always / Never' };
+  list.innerHTML = rules.map(r => {
+    const mealStr = r.meal && r.meal !== 'any' ? ` · ${r.meal}` : '';
+    let summary = '';
+    if (r.type === 'day_theme') summary = `Every ${r.trigger}${mealStr}: suggest ${r.action}`;
+    else if (r.type === 'frequency') summary = `${r.trigger}${mealStr}: ${r.action}`;
+    else if (r.type === 'always_never') summary = `${r.trigger}: ${r.action}`;
+    return `<div style="background:#fff;border:1px solid var(--mist);border-radius:6px;padding:12px 14px;display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+      <div style="flex:1;">
+        <div style="font-family:'DM Mono',monospace;font-size:0.5rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--rust);margin-bottom:3px;">${typeLabels[r.type]||r.type}</div>
+        <div style="font-family:'DM Sans',sans-serif;font-size:0.82rem;color:var(--ink);">${summary}</div>
+      </div>
+      <button onclick="deleteRule('${loc}',${r.id})"
+        style="background:none;border:none;color:#D0C8BE;cursor:pointer;font-size:1rem;padding:2px 6px;border-radius:3px;transition:color 0.15s;"
+        onmouseover="this.style.color='#B84C27'" onmouseout="this.style.color='#D0C8BE'">×</button>
+    </div>`;
+  }).join('');
+
+  // Show/hide add button based on count
+  document.getElementById('addRuleBtn').style.display = rules.length >= 5 ? 'none' : 'block';
+}
+
+function getHouseRulesPrompt(loc, meal, dayName) {
+  const rules = getHouseRules(loc);
+  if (!rules.length) return '';
+
+  const active = rules.filter(r => {
+    if (r.type === 'day_theme') return r.trigger === dayName && (r.meal === 'any' || r.meal === meal);
+    if (r.type === 'frequency') return r.meal === 'any' || r.meal === meal;
+    if (r.type === 'always_never') return true;
+    return true;
+  });
+
+  if (!active.length) return '';
+
+  const lines = active.map(r => {
+    if (r.type === 'day_theme') return `RULE: Today is ${dayName} — suggestions MUST be ${r.action}`;
+    if (r.type === 'frequency') {
+      const isAtLeast = r.trigger.startsWith('At least');
+      const isAtMost = r.trigger.startsWith('At most');
+      const count = r.trigger.match(/\d+/)?.[0] || '1';
+      return `RULE: ${isAtLeast?'Try to include':'Limit to'} ${count}x ${r.action} per week for ${meal}`;
+    }
+    if (r.type === 'always_never') return `RULE: ${r.trigger} ${r.action}`;
+    return '';
+  }).filter(Boolean);
+
+  return `\nHOUSE RULES FOR ${loc.toUpperCase()} — follow these strictly:\n${lines.join('\n')}`;
+}
+
+// Init rules on first load
 loadStyleSettings();
 </script>
 
 <style>
+/* ══ BEST HITS / RATING STYLES ══ */
+.rating-card{background:#fff;border:1px solid var(--mist);border-radius:8px;padding:14px 18px;display:flex;align-items:flex-start;gap:14px;}
+.rating-dish-info{flex:1;}
+.rating-dish-name{font-family:'Playfair Display',serif;font-size:0.9rem;color:var(--ink);margin-bottom:2px;}
+.rating-dish-meta{font-family:'DM Mono',monospace;font-size:0.52rem;color:var(--warm-gray);letter-spacing:0.06em;}
+.rating-stars{display:flex;gap:4px;margin-top:8px;}
+.star-btn{background:none;border:none;font-size:1.3rem;cursor:pointer;color:#D0C8BE;transition:color 0.15s;padding:0;line-height:1;}
+.star-btn.lit{color:#C9973A;}
+.star-btn:hover{color:#C9973A;}
+.rating-notes-input{width:100%;margin-top:8px;background:#F7F3EC;border:1px solid var(--mist);color:var(--ink);padding:6px 10px;font-family:'DM Sans',sans-serif;font-size:0.75rem;border-radius:4px;outline:none;resize:none;}
+.best-hits-badge{display:inline-flex;align-items:center;gap:4px;background:#FDF8F0;border:1px solid #C9973A;color:#854F0B;font-family:'DM Mono',monospace;font-size:0.48rem;letter-spacing:0.08em;text-transform:uppercase;padding:2px 7px;border-radius:3px;margin-left:6px;}
+.global-hit-badge{background:#F0F5F0;border-color:#4A6741;color:#27500A;}
 /* ══ KPI TAB STYLES ══ */
 #tabKpi { flex-direction:row; }
 .kpi-layout { display:grid; grid-template-columns:300px 1fr; width:100%; overflow:hidden; }
@@ -1417,12 +1666,15 @@ function saveCurrentSession() {
   data.lastSaved = new Date().toISOString();
   data.pubData = allPubData;
   data.finalBohData = finalBohData;
+  data.bestHits = bestHits;
+  data.globalHits = globalHits;
   data.stagedItems = stagedItems;
   data.availableWeeks = availableWeeks;
   data.currentWeekKey = currentWeekKey;
   data.pubActiveDays = pubActiveDays;
   data.masterLocation = getLoc();
   data.styleSettings = styleSettings;
+  data.houseRules = houseRules;
   data.manualKpiValues = manualKpiValues;
   data.weeklyBudget = document.getElementById('weeklyBudget')?.value||'';
   data.maxPremium = document.getElementById('maxPremium')?.value||'3';
@@ -1462,6 +1714,8 @@ function loadChefSession(name) {
     });
   }
   if (data.finalBohData) finalBohData = data.finalBohData;
+  if (data.bestHits) bestHits = data.bestHits;
+  if (data.globalHits) globalHits = data.globalHits;
   if (data.stagedItems) stagedItems = data.stagedItems;
   if (data.availableWeeks && data.availableWeeks.length) {
     availableWeeks = data.availableWeeks;
@@ -1480,6 +1734,7 @@ function loadChefSession(name) {
     updateContextPill();
   }
   if (data.styleSettings) styleSettings = data.styleSettings;
+  if (data.houseRules) houseRules = data.houseRules;
   if (data.manualKpiValues) manualKpiValues = data.manualKpiValues;
   if (data.weeklyBudget && document.getElementById('weeklyBudget')) {
     document.getElementById('weeklyBudget').value = data.weeklyBudget;
@@ -1849,25 +2104,49 @@ async function generateSuggestions() {
   if (isSorority) {
     const isMonday = selectedDayIndex === 0;
     const isMonDinner = isMonday && selectedMeal === 'Dinner';
-    audienceNote = `Sorority house (${location}), ~40 members. These are health-conscious college women who love:
-- Bowl concepts: poke bowls, grain bowls, protein bowls, rice bowls, Mediterranean bowls
+    const isLunch = selectedMeal === 'Lunch';
+    audienceNote = `Sorority house (${location}), ~40 members.
+
+CUISINE BALANCE — IMPORTANT: The majority of suggestions should feel familiar and accessible to American college students. Aim for roughly:
+- 2 of 3 suggestions: American, Italian, Mexican, or Mediterranean
+- At most 1 of 3 suggestions: Asian or other global cuisine
+Do NOT default to international cuisines. Students here want food that feels fresh and approachable, not unfamiliar.
+
+${isLunch ? `LUNCH FORMAT — students have class schedules, lunch must be quick and easy to eat:
+- MANDATORY: at least 1 of the 3 suggestions must be a build-your-own bowl, wrap, or sandwich format (think Chipotle-style assembly — protein, base, toppings, sauce)
+- The other 2 can be plated but should still be light and quick
+- Good lunch formats: grain bowls, burrito bowls, chicken caesar wraps, sandwich platters, pita + protein + veggies, rice bowls with protein
+- Avoid heavy sit-down dinner-style dishes for lunch` : ''}
+
+FLAVOR PROFILE:
 - Fresh, bright, colorful dishes with clean flavors
 - Strong vegetarian/vegan options — at least 1 of the 3 suggestions should be plant-based
-- Lighter proteins: chicken breast, salmon, shrimp, tofu, legumes
-- Global flavors done in an accessible way: Korean, Thai, Mediterranean, Mexican
+- Lighter proteins: chicken breast, salmon, tofu, legumes (shrimp only occasionally — it's premium)
 - Avoid: heavy cream sauces, very rich or greasy dishes, anything that feels like "dorm food"
-${isMonDinner ? `MONDAY CHAPTER NIGHT — volume is 2-3x normal. ALL 3 suggestions MUST be pasta-based dishes. Be creative — not just spaghetti and meatballs. Think: baked ziti, pasta primavera, pesto tortellini, orzo salads, creamy mushroom pappardelle, Thai peanut noodles, cold sesame noodles. Pasta is the format; the flavor profile can range widely.` : ''}
+${isMonDinner ? `MONDAY CHAPTER NIGHT — volume is 2-3x normal. ALL 3 suggestions MUST be pasta-based dishes. Be creative — not just spaghetti and meatballs. Think: baked ziti, pasta primavera, pesto tortellini, orzo salads, creamy mushroom pappardelle. Pasta is the format; keep flavors bright and accessible.` : ''}
 This is a single cohesive meal — no stations. Generate 3 complete meals each with a main + 2 sides.`;
   } else if (isFrat) {
     const isMonday = selectedDayIndex === 0;
     const isMonDinner = isMonday && selectedMeal === 'Dinner';
-    audienceNote = `Fraternity house (${location}), ~40 members. These are hungry college men who love:
-- Comfort food with a creative twist: smash burgers, loaded pasta, wings with interesting sauces, tacos
-- Hearty portions, protein-forward, satisfying
-- IMPORTANT: always add a creative spin — not plain grilled chicken or basic spaghetti. Think: "Calabrian chili pasta" not "pasta with red sauce", "Korean BBQ smash burger" not "cheeseburger"
+    const isLunch = selectedMeal === 'Lunch';
+    audienceNote = `Fraternity house (${location}), ~40 members.
+
+CUISINE BALANCE — IMPORTANT: The majority of suggestions should feel like food college guys actually want to eat — familiar American comfort food with a creative twist. Aim for roughly:
+- 2 of 3 suggestions: American, Italian, Mexican, or BBQ-style
+- At most 1 of 3 suggestions: Asian or other global cuisine
+Do NOT default to international cuisines. These guys want burgers, pasta, tacos, wings — done well, not done exotic.
+
+${isLunch ? `LUNCH FORMAT — quick and satisfying, students have afternoon classes:
+- MANDATORY: at least 1 of the 3 suggestions must be a build-your-own bowl, sandwich, or handheld format (think Chipotle-style or sub shop)
+- Good lunch formats: burrito bowls, smash burger sliders, chicken sandwich bar, rice bowls, sub sandwiches, loaded wraps
+- Keep it hearty but fast — avoid anything that takes a long time to plate or eat` : ''}
+
+FLAVOR PROFILE:
+- Comfort food with a creative twist — not plain, but not unfamiliar
+- IMPORTANT: always add a spin — "Calabrian chili pasta" not "pasta with red sauce", "Nashville hot chicken sandwich" not "chicken sandwich"
 - Bold flavors: smoky, spicy, umami-rich, tangy BBQ
 - One option should always be a solid vegetarian alternative that still feels hearty (not a salad)
-${isMonDinner ? `MONDAY CHAPTER NIGHT — volume is 2-3x normal. ALL 3 suggestions MUST be pasta-based dishes. Be creative and bold — not just spaghetti and meatballs. Think: baked mac and cheese with pulled pork, spicy arrabbiata rigatoni, lasagna bolognese, vodka penne, loaded baked pasta, ramen-style noodle bowls. Pasta is the format; keep the flavors hearty and interesting.` : ''}
+${isMonDinner ? `MONDAY CHAPTER NIGHT — volume is 2-3x normal. ALL 3 suggestions MUST be pasta-based dishes. Be creative and bold — think: baked mac and cheese with pulled pork, spicy arrabbiata rigatoni, lasagna bolognese, vodka penne. Pasta is the format; keep flavors hearty and familiar.` : ''}
 This is a single cohesive meal — no stations. Generate 3 complete meals each with a main + 2 sides.`;
   } else {
     // Hendrick House — station-specific profiles
@@ -2038,12 +2317,37 @@ STRICT RULES:
 
   const greekMealNote = greek ? `This is a single unified ${selectedMeal} menu for the whole house — not broken into stations.` : '';
 
-  const prompt = `You are a professional chef consultant for a university food service company in Champaign, IL.
+  // Best hits context
+  const { relevant: localHits, crossHits } = getBestHitsContext(location, selectedMeal, station);
+  const bestHitsNote = (localHits.length || crossHits.length) ? `
+BEST HITS LIBRARY — dishes that worked well at this location:
+${localHits.map(h => {
+  const wks = weeksSince(h.lastServed);
+  const urgency = wks >= 8 ? 'OVERDUE — ' : wks >= 3 ? 'Due for return — ' : '';
+  return `- "${h.name}" (${h.stars} stars, last served ${wks}w ago${h.notes?', note: '+h.notes:''}): ${urgency}${wks>=3?'consider resurfacing this dish':'recently served, avoid repeating'}`;
+}).join('\n')}
+${crossHits.length ? `CROSS-LOCATION HITS — 5-star dishes from other houses worth introducing here:\n${crossHits.map(h => `- "${h.name}" (5 stars at ${h.sourceLocation}, ${weeksSince(h.lastServed)}w ago) — first time suggesting this here`).join('\n')}` : ''}
 
+INSTRUCTIONS FOR BEST HITS:
+- If any dish is marked OVERDUE (8+ weeks), strongly consider including it as one of your 3 suggestions
+- If any cross-location hit is listed, consider introducing it as one option and mention its origin
+- Do NOT suggest dishes marked recently served` : '';
+
+  // House rules
+  const dayName = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'][selectedDayIndex] || '';
+  const houseRulesNote = getHouseRulesPrompt(location, selectedMeal, dayName);
+
+  const prompt = `You are a professional chef consultant for a university food service company in Champaign, IL.
+${houseRulesNote}
+${theme ? `
+⚠️ MANDATORY THEME — THIS OVERRIDES ALL OTHER INSTRUCTIONS:
+The chef has specifically requested: "${theme}"
+ALL 3 suggestions MUST directly honor this theme. If the chef says "Italian with pasta" every suggestion must be Italian pasta. If they say "American and mac and cheese" every suggestion must be American comfort food. The theme is a hard constraint — ignore cuisine rotation rules and diversity rules if they conflict with the theme.
+` : ''}
 ${audienceNote}
-${theme ? `Chef's note: "${theme}"` : ''}
 ${inventory ? `IMPORTANT — Ingredients to use up: ${inventory}. Lean heavily toward suggestions using these. All 3 options should incorporate at least one if possible.` : ''}
 ${diversityNote}
+${bestHitsNote}
 ${greekMealNote}
 ${getStylePrompt(location)}
 
@@ -2359,7 +2663,7 @@ function renderBOH(id, name, d) {
   }
   el.innerHTML=`
     <div class="boh-card-name">🔪 ${name}</div>
-    <div class="boh-sec">Ingredients (~${size} servings)</div>
+    <div class="boh-sec">Ingredients (~${size} portions incl. buffer)</div>
     <ul class="boh-list">${(d.ingredients||[]).map(i=>`<li>${i}</li>`).join('')}</ul>
     <div class="boh-sec">Prep & Cooking Steps</div>
     <ol class="boh-steps">${(d.steps||[]).map(s=>`<li>${s}</li>`).join('')}</ol>
@@ -2451,9 +2755,157 @@ function sendToPublish() {
     `<strong>${staged.length} items</strong> published for ${loc}, ${weekLabel(wk)}.`;
   renderMenuCard();
   renderFinalBohSheet();
+  renderRatingSection();
   populateKpiFromAccepted();
   if (currentChef) saveCurrentSession();
   switchTab('publish');
+}
+
+// ═══════════════════════════
+// BEST HITS
+// ═══════════════════════════
+
+// bestHits[location] = [{ name, desc, station, meal, stars, notes, lastServed, serveCount, addedFrom }]
+let bestHits = {};
+// globalHits = [{ name, desc, station, meal, stars, sourceLocation, lastServed, serveCount }]
+let globalHits = [];
+
+function getBestHits(loc) {
+  if (!bestHits[loc]) bestHits[loc] = [];
+  return bestHits[loc];
+}
+
+function weeksSince(dateStr) {
+  if (!dateStr) return 999;
+  const diff = Date.now() - new Date(dateStr+'T00:00:00').getTime();
+  return Math.floor(diff / (7 * 24 * 60 * 60 * 1000));
+}
+
+// Called after sendToPublish — renders rating cards for this week's dishes
+function renderRatingSection() {
+  const items = getFinalBoh();
+  const section = document.getElementById('rateWeekSection');
+  const list = document.getElementById('ratingCardList');
+  if (!section || !list) return;
+  if (!items.length) { section.style.display='none'; return; }
+  section.style.display = 'block';
+  list.innerHTML = '';
+
+  items.forEach((item, idx) => {
+    const loc = getLoc();
+    const existing = getBestHits(loc).find(h => h.name === item.name);
+    const currentStars = existing?.stars || 0;
+    const currentNotes = existing?.notes || '';
+    const dateStr = item.date
+      ? new Date(item.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})
+      : '';
+    const isGrk = isGreekHouse(loc);
+    const metaLabel = (isGrk || item.station==='Breakfast') ? item.meal : item.meal+' · '+item.station;
+
+    const card = document.createElement('div');
+    card.className = 'rating-card';
+    card.id = `rcard-${idx}`;
+    card.innerHTML = `
+      <div class="rating-dish-info">
+        <div class="rating-dish-name">${item.name}</div>
+        <div class="rating-dish-meta">${metaLabel}${dateStr?' · '+dateStr:''}</div>
+        <div class="rating-stars" id="stars-${idx}">
+          ${[1,2,3,4,5].map(n =>
+            `<button class="star-btn${n<=currentStars?' lit':''}" data-val="${n}" onclick="setStars(${idx},${n})">★</button>`
+          ).join('')}
+          <span style="font-family:'DM Mono',monospace;font-size:0.54rem;color:var(--warm-gray);margin-left:6px;" id="star-label-${idx}">${currentStars>0?currentStars+' star'+(currentStars>1?'s':''):'Not rated'}</span>
+        </div>
+        <textarea class="rating-notes-input" id="notes-${idx}" rows="1" placeholder="Chef notes (optional): ran out at 6pm, too spicy, students loved it…">${currentNotes}</textarea>
+      </div>`;
+    list.appendChild(card);
+    // Store item ref on card for saving
+    card.dataset.itemName = item.name;
+    card.dataset.itemDesc = item.desc || '';
+    card.dataset.itemStation = item.station || '';
+    card.dataset.itemMeal = item.meal || '';
+    card.dataset.itemDate = item.date || '';
+  });
+}
+
+function setStars(idx, val) {
+  const starsEl = document.getElementById(`stars-${idx}`);
+  const label = document.getElementById(`star-label-${idx}`);
+  starsEl.querySelectorAll('.star-btn').forEach(b => {
+    b.classList.toggle('lit', parseInt(b.dataset.val) <= val);
+  });
+  label.textContent = val + ' star' + (val>1?'s':'');
+  starsEl.dataset.rating = val;
+}
+
+function saveAllRatings() {
+  const loc = getLoc();
+  const wk = getWeekKey();
+  const cards = document.querySelectorAll('#ratingCardList .rating-card');
+  let savedCount = 0;
+  let globalCount = 0;
+
+  cards.forEach((card, idx) => {
+    const stars = parseInt(document.getElementById(`stars-${idx}`)?.dataset.rating || 0);
+    const notes = document.getElementById(`notes-${idx}`)?.value || '';
+    const name = card.dataset.itemName;
+    const desc = card.dataset.itemDesc;
+    const station = card.dataset.itemStation;
+    const meal = card.dataset.itemMeal;
+    const date = card.dataset.itemDate;
+
+    if (stars < 1) return; // unrated — skip
+
+    // Update or add to location best hits
+    const hits = getBestHits(loc);
+    const existing = hits.findIndex(h => h.name === name);
+    const entry = {
+      name, desc, station, meal, stars, notes,
+      lastServed: date || wk,
+      serveCount: existing>=0 ? (hits[existing].serveCount||1)+1 : 1,
+      addedFrom: loc
+    };
+    if (existing >= 0) hits[existing] = entry;
+    else hits.push(entry);
+    savedCount++;
+
+    // 5-star dishes go to global hits
+    if (stars === 5) {
+      const gIdx = globalHits.findIndex(h => h.name === name);
+      const globalEntry = { name, desc, station, meal, stars, sourceLocation: loc, lastServed: date||wk, serveCount: entry.serveCount };
+      if (gIdx >= 0) globalHits[gIdx] = globalEntry;
+      else globalHits.push(globalEntry);
+      globalCount++;
+    }
+  });
+
+  if (currentChef) saveCurrentSession();
+
+  // Visual feedback
+  const btn = document.querySelector('#rateWeekSection .pub-xbtn');
+  if (btn) {
+    const orig = btn.textContent;
+    btn.textContent = `✓ Saved ${savedCount} rating${savedCount!==1?'s':''}${globalCount>0?` · ${globalCount} added to global hits`:''}`;
+    setTimeout(()=>{ btn.textContent = orig; }, 3000);
+  }
+}
+
+// Get best hits relevant to current context for AI injection
+function getBestHitsContext(loc, meal, station) {
+  const now = new Date();
+  const hits = getBestHits(loc);
+  const relevant = hits
+    .filter(h => h.stars >= 4 && (h.meal === meal || !h.meal) && (h.station === station || isGreekHouse(loc)))
+    .filter(h => weeksSince(h.lastServed) >= 3)
+    .sort((a,b) => b.stars - a.stars || weeksSince(b.lastServed) - weeksSince(a.lastServed));
+
+  // Also pull global hits from other locations (5-star, 5+ weeks old, not already in local hits)
+  const localNames = new Set(hits.map(h=>h.name));
+  const crossHits = globalHits
+    .filter(h => h.sourceLocation !== loc && !localNames.has(h.name))
+    .filter(h => weeksSince(h.lastServed) >= 5)
+    .slice(0, 3); // max 3 cross-location suggestions
+
+  return { relevant: relevant.slice(0,5), crossHits };
 }
 
 // ═══════════════════════════
@@ -2550,16 +3002,34 @@ function renderMenuCard() {
     </div>`;
   }
 
-  // ── Cell with macro and delete button ──
+  // ── Cell with macro, delete button, and drag handle ──
   function cell(dayIdx, meal, station) {
     const { name, desc } = getPubCell(dayIdx, meal, station);
-    if (!name) return `<td class="mc-cell"><div class="mc-cell-empty">—</div></td>`;
     const escapedStation = station.replace(/'/g, "\'");
-    return `<td class="mc-cell" style="position:relative;">
-      <button onclick="deletePubCell(${dayIdx},'${meal}','${escapedStation}')"
-        title="Remove from menu"
-        style="position:absolute;top:3px;right:3px;background:none;border:none;color:#D0C8BE;cursor:pointer;font-size:0.75rem;line-height:1;padding:1px 3px;border-radius:2px;transition:color 0.15s;"
-        onmouseover="this.style.color='#B84C27'" onmouseout="this.style.color='#D0C8BE'">×</button>
+    const cellId = `pc-${dayIdx}-${meal.replace(/\s/g,'')}-${station.replace(/\s/g,'')}`;
+    if (!name) {
+      return `<td class="mc-cell mc-cell-empty-drop" id="${cellId}"
+        data-day="${dayIdx}" data-meal="${meal}" data-station="${escapedStation}"
+        ondragover="event.preventDefault();this.classList.add('drag-over')"
+        ondragleave="this.classList.remove('drag-over')"
+        ondrop="onPubCellDrop(event,${dayIdx},'${meal}','${escapedStation}')">
+        <div style="color:#D0C8BE;font-size:0.75rem;text-align:center;padding:8px 0;">—</div>
+      </td>`;
+    }
+    return `<td class="mc-cell" id="${cellId}" style="position:relative;"
+      draggable="true"
+      data-day="${dayIdx}" data-meal="${meal}" data-station="${escapedStation}"
+      ondragstart="onPubCellDragStart(event,${dayIdx},'${meal}','${escapedStation}')"
+      ondragover="event.preventDefault();this.classList.add('drag-over')"
+      ondragleave="this.classList.remove('drag-over')"
+      ondrop="onPubCellDrop(event,${dayIdx},'${meal}','${escapedStation}')">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px;">
+        <div style="cursor:grab;color:#D0C8BE;font-size:0.7rem;padding:1px 2px;line-height:1;user-select:none;" title="Drag to move to another day">⠿</div>
+        <button onclick="deletePubCell(${dayIdx},'${meal}','${escapedStation}')"
+          title="Remove from menu"
+          style="background:none;border:none;color:#D0C8BE;cursor:pointer;font-size:0.75rem;line-height:1;padding:1px 3px;border-radius:2px;transition:color 0.15s;flex-shrink:0;"
+          onmouseover="this.style.color='#B84C27'" onmouseout="this.style.color='#D0C8BE'">×</button>
+      </div>
       <div class="mc-cell-name">${name}</div>
       ${desc?`<div class="mc-cell-desc">${desc}</div>`:''}
       ${macroHTML(name)}
@@ -2579,7 +3049,7 @@ function renderMenuCard() {
     <div class="mc-banner">
       <div>
         <div class="mc-logo" style="font-size:1.3rem;">${greekHouseName}</div>
-        <div style="font-family:'DM Mono',monospace;font-size:0.5rem;letter-spacing:0.14em;text-transform:uppercase;color:#8A8278;margin-top:3px;">University of Illinois · Urbana-Champaign</div>
+        <div style="font-family:'DM Mono',monospace;font-size:0.6rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:#C8C0B4;margin-top:3px;">University of Illinois · Urbana-Champaign</div>
       </div>
       <div class="mc-banner-right">
         <div class="mc-week-label">Menu for the week of</div>
@@ -2742,7 +3212,7 @@ function renderFinalBohSheet() {
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
         <div>
-          <div style="font-family:'DM Mono',monospace;font-size:0.52rem;letter-spacing:0.12em;text-transform:uppercase;color:#4A6741;margin-bottom:6px;">Ingredients (~${size} servings)</div>
+          <div style="font-family:'DM Mono',monospace;font-size:0.52rem;letter-spacing:0.12em;text-transform:uppercase;color:#4A6741;margin-bottom:6px;">Ingredients (~${size} portions incl. buffer)</div>
           <ul style="margin:0;padding-left:16px;font-size:0.78rem;line-height:1.8;color:#3A3530;">${(d.ingredients||[]).map(i=>`<li>${i}</li>`).join('')}</ul>
         </div>
         <div>
@@ -2899,6 +3369,32 @@ function exportShoppingListXLSX(data, loc, wk) {
 }
 
 
+function exportBestHitsXLSX() {
+  const wb = XLSX.utils.book_new();
+
+  // Sheet 1: Per-location hits
+  const locRows = [['Location','Dish','Meal','Station','Stars','Last Served','Times Served','Chef Notes']];
+  Object.entries(bestHits).forEach(([loc, hits]) => {
+    hits.sort((a,b) => b.stars - a.stars || weeksSince(a.lastServed) - weeksSince(b.lastServed))
+      .forEach(h => locRows.push([loc, h.name, h.meal||'', h.station||'', h.stars, h.lastServed||'', h.serveCount||1, h.notes||'']));
+  });
+  const ws1 = XLSX.utils.aoa_to_sheet(locRows);
+  ws1['!cols'] = [{wch:20},{wch:32},{wch:10},{wch:14},{wch:6},{wch:14},{wch:14},{wch:32}];
+  XLSX.utils.book_append_sheet(wb, ws1, 'By Location');
+
+  // Sheet 2: Global 5-star hits
+  const globalRows = [['Dish','Meal','Station','Source Location','Last Served','Times Served']];
+  globalHits.sort((a,b) => weeksSince(a.lastServed) - weeksSince(b.lastServed))
+    .forEach(h => globalRows.push([h.name, h.meal||'', h.station||'', h.sourceLocation||'', h.lastServed||'', h.serveCount||1]));
+  const ws2 = XLSX.utils.aoa_to_sheet(globalRows);
+  ws2['!cols'] = [{wch:32},{wch:10},{wch:14},{wch:20},{wch:14},{wch:14}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Global 5-Star Hits');
+
+  const date = new Date().toISOString().split('T')[0];
+  XLSX.writeFile(wb, `BestHits_${date}.xlsx`);
+}
+
+
 function exportBohPDF() {
   const items = getFinalBoh();
   if (!items.length) { alert('No finalized BOH notes yet — click Send to Publish first.'); return; }
@@ -2927,6 +3423,44 @@ function exportBohPDF() {
   </body></html>`);
   win.document.close();
   setTimeout(()=>{ win.focus(); win.print(); win.close(); }, 900);
+}
+
+// ═══════════════════════════
+// PUBLISH DRAG & DROP
+// ═══════════════════════════
+let _dragSrc = null; // { dayIdx, meal, station, name, desc }
+
+function onPubCellDragStart(event, dayIdx, meal, station) {
+  const { name, desc } = getPubCell(dayIdx, meal, station);
+  _dragSrc = { dayIdx, meal, station, name, desc };
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', name);
+}
+
+function onPubCellDrop(event, toDayIdx, toMeal, toStation) {
+  event.preventDefault();
+  event.currentTarget.classList.remove('drag-over');
+  if (!_dragSrc) return;
+  const { dayIdx: fromDayIdx, meal: fromMeal, station: fromStation, name: fromName, desc: fromDesc } = _dragSrc;
+  // Don't swap with itself
+  if (fromDayIdx === toDayIdx && fromMeal === toMeal && fromStation === toStation) { _dragSrc = null; return; }
+  // Get destination content (may be empty)
+  const { name: toName, desc: toDesc } = getPubCell(toDayIdx, toMeal, toStation);
+  // Swap
+  if (toName) {
+    setPubCell(fromDayIdx, fromMeal, fromStation, toName, toDesc);
+  } else {
+    // Destination was empty — just clear the source
+    const pd = getPubData();
+    if (pd[fromDayIdx]) {
+      const key = fromMeal === 'Breakfast' ? 'breakfast' : `${fromMeal.toLowerCase()}_${fromStation}`;
+      delete pd[fromDayIdx][key];
+    }
+  }
+  setPubCell(toDayIdx, toMeal, toStation, fromName, fromDesc);
+  _dragSrc = null;
+  renderMenuCard();
+  if (currentChef) saveCurrentSession();
 }
 
 // ═══════════════════════════
@@ -3075,10 +3609,14 @@ function getMealCustomers(meal) {
   return 0;
 }
 function getServingSize() {
+  // Apply a 50% buffer to all quantity estimates — accounts for seconds, waste, and
+  // variance in attendance. This flows through to BOH ingredient quantities and
+  // cost estimates in the Analyze tab.
+  const QUANTITY_BUFFER = 1.5;
   if (isGreekLocation()) {
-    return parseFloat(document.getElementById('asmGreekDinner')?.value)||40;
+    return Math.round((parseFloat(document.getElementById('asmGreekDinner')?.value)||40) * QUANTITY_BUFFER);
   }
-  return parseFloat(document.getElementById('asmDinner')?.value)||220;
+  return Math.round((parseFloat(document.getElementById('asmDinner')?.value)||220) * QUANTITY_BUFFER);
 }
 
 // manualKpiValues: persists cost/macro data entered by chef, keyed by dish name

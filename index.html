@@ -1417,26 +1417,40 @@ const STORAGE_VERSION = 3;
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 const STATIONS = ['Homestyle','Sizzle','Veggie Life','Pizza'];
 
-// ── Unified Claude API call ──
-async function callClaude(prompt, maxTokens=1000) {
+// ── Unified Claude API call with retry ──
+async function callClaude(prompt, maxTokens=1000, retries=3) {
   if (!window.API_KEY) throw new Error('No API key');
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': window.API_KEY,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: maxTokens,
-      messages: [{ role: 'user', content: prompt }]
-    })
-  });
-  if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || `HTTP ${res.status}`); }
-  const data = await res.json();
-  return data.content.map(b => b.text || '').join('').replace(/```json|```/g, '').trim();
+  for (let attempt = 0; attempt < retries; attempt++) {
+    if (attempt > 0) {
+      const delay = attempt * 2000; // 2s, 4s backoff
+      await new Promise(r => setTimeout(r, delay));
+    }
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': window.API_KEY,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: maxTokens,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.content.map(b => b.text || '').join('').replace(/```json|```/g, '').trim();
+    }
+    const e = await res.json().catch(() => ({}));
+    const status = res.status;
+    // Only retry on 529 (overloaded) or 503 or timeout-like errors
+    if (status === 529 || status === 503 || status === 502) {
+      if (attempt < retries - 1) continue;
+    }
+    throw new Error(e.error?.message || `HTTP ${status}`);
+  }
 }
 
 let selectedMeal = 'Breakfast';
@@ -2357,6 +2371,7 @@ Generate 3 featured pizza options.${recycleContext}`;
 
   const alreadyAccepted = acceptedItems
     .filter(item => item.location === location)
+    .slice(-12)  // cap to 12 most recent to keep prompt size manageable
     .map(item => `${item.name}${item._cuisine?' ['+item._cuisine+']':''}${item._protein?' ('+item._protein+')':''}`);
 
   const diversityNote = alreadyAccepted.length > 0 ? `
@@ -2380,14 +2395,16 @@ STRICT RULES:
 
   // Best hits context
   const { relevant: localHits, crossHits } = getBestHitsContext(location, selectedMeal, station);
-  const bestHitsNote = (localHits.length || crossHits.length) ? `
+  const localHitsCapped = localHits.slice(0, 6);
+  const crossHitsCapped = crossHits.slice(0, 3);
+  const bestHitsNote = (localHitsCapped.length || crossHitsCapped.length) ? `
 BEST HITS LIBRARY — dishes that worked well at this location:
-${localHits.map(h => {
+${localHitsCapped.map(h => {
   const wks = weeksSince(h.lastServed);
   const urgency = wks >= 8 ? 'OVERDUE — ' : wks >= 3 ? 'Due for return — ' : '';
   return `- "${h.name}" (${h.stars} stars, last served ${wks}w ago${h.notes?', note: '+h.notes:''}): ${urgency}${wks>=3?'consider resurfacing this dish':'recently served, avoid repeating'}`;
 }).join('\n')}
-${crossHits.length ? `CROSS-LOCATION HITS — 5-star dishes from other houses worth introducing here:\n${crossHits.map(h => `- "${h.name}" (5 stars at ${h.sourceLocation}, ${weeksSince(h.lastServed)}w ago) — first time suggesting this here`).join('\n')}` : ''}
+${crossHitsCapped.length ? `CROSS-LOCATION HITS — 5-star dishes from other houses worth introducing here:\n${crossHitsCapped.map(h => `- "${h.name}" (5 stars at ${h.sourceLocation}, ${weeksSince(h.lastServed)}w ago) — first time suggesting this here`).join('\n')}` : ''}
 
 INSTRUCTIONS FOR BEST HITS:
 - If any dish is marked OVERDUE (8+ weeks), strongly consider including it as one of your 3 suggestions
@@ -2437,7 +2454,7 @@ Respond ONLY with valid JSON:
     const parsed = JSON.parse(text);
     renderSuggestions(parsed.options, station);
   } catch(err) {
-    grid.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-label">Error: ${err.message}</div></div>`;
+    grid.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-label">Error: ${err.message}</div><button onclick="generateSuggestions()" style="margin-top:12px;background:var(--sage);color:#fff;border:none;padding:8px 16px;font-family:'DM Mono',monospace;font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;border-radius:3px;cursor:pointer;">↺ Retry</button></div>`;
   } finally {
     document.getElementById('generateBtn').disabled = false;
   }

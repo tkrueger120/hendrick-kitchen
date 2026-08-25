@@ -3446,26 +3446,11 @@ Your job:
 
 Respond ONLY with valid JSON:
 {
-  "categories": [
-    {
-      "name": "Proteins",
-      "items": [
-        {
-          "ingredient": "Chicken thighs",
-          "dishes": [
-            {"dish": "Harissa Chicken (Tue Dinner)", "quantity": "8 lbs"},
-            {"dish": "Tikka Masala (Wed Dinner)", "quantity": "10 lbs"}
-          ],
-          "total": "18 lbs"
-        }
-      ]
-    }
-  ]
-}
-Include only categories that have at least one item. Use these exact category names: Proteins, Dairy & Eggs, Produce, Grains Pasta & Bread, Pantry & Spices, Fresh Herbs, Other.`;
+  "categories":[{"name":"Proteins","items":[{"ingredient":"Chicken thighs","dishes":[{"dish":"Harissa Chicken","quantity":"8 lbs"}],"total":"8 lbs"}]}]}
+Include only categories with items. Use exact names: Proteins, Dairy & Eggs, Produce, Grains Pasta & Bread, Pantry & Spices, Fresh Herbs, Other.`;
 
   try {
-    const text = await callClaude(prompt, 4000);
+    const text = await callClaude(prompt, 6000);
     let data;
     try {
       data = JSON.parse(text);

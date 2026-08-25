@@ -1455,6 +1455,28 @@ let currentWeekKey = '';
 // ── Published data: allPubData[loc][weekKey][dayIdx][rowKey] = { name, desc } ──
 let allPubData = {};
 
+// ── Closed stations: closedStations[loc_week_dayIdx] = [station, ...] ──
+let closedStations = {};
+
+function getClosedKey(dayIdx) {
+  return `${getLoc()}_${getWeekKey()}_${dayIdx}`;
+}
+
+function toggleStationClosed(dayIdx, station) {
+  const key = getClosedKey(dayIdx);
+  if (!closedStations[key]) closedStations[key] = [];
+  const idx = closedStations[key].indexOf(station);
+  if (idx >= 0) closedStations[key].splice(idx, 1);
+  else closedStations[key].push(station);
+  renderMenuCard();
+  if (currentChef) saveCurrentSession();
+}
+
+function isStationClosedGlobal(dayIdx, station) {
+  const key = getClosedKey(dayIdx);
+  return (closedStations[key] || []).includes(station);
+}
+
 // ── Finalized BOH notes: finalBohData[loc][weekKey] = [{ name, meal, station, date, bohData }] ──
 let finalBohData = {};
 
@@ -1608,6 +1630,81 @@ function saveChefData(name, data) {
   try { localStorage.setItem('hh_chef_'+name, JSON.stringify(data)); } catch(e) {}
 }
 
+// Location-level storage — shared across all chefs
+function getLocData(loc) {
+  try { return JSON.parse(localStorage.getItem('hh_loc_'+loc)||'{}'); } catch(e) { return {}; }
+}
+function saveLocData(loc, data) {
+  try { localStorage.setItem('hh_loc_'+loc, JSON.stringify(data)); } catch(e) {}
+}
+
+function saveLocationData() {
+  const loc = getLoc();
+  const data = getLocData(loc);
+  data.version = STORAGE_VERSION;
+  data.lastSaved = new Date().toISOString();
+  data.pubData = allPubData;
+  data.closedStations = closedStations;
+  data.finalBohData = finalBohData;
+  data.bestHits = bestHits;
+  data.globalHits = globalHits;
+  data.stagedItems = stagedItems;
+  data.availableWeeks = availableWeeks;
+  data.currentWeekKey = currentWeekKey;
+  data.pubActiveDays = pubActiveDays;
+  data.houseRules = houseRules;
+  data.styleSettings = styleSettings;
+  data.manualKpiValues = manualKpiValues;
+  data.weeklyBudget = document.getElementById('weeklyBudget')?.value||'';
+  data.maxPremium = document.getElementById('maxPremium')?.value||'3';
+  data.asmGreekVeg = document.getElementById('asmGreekVeg')?.value||'0';
+  data.asmGreekVegan = document.getElementById('asmGreekVegan')?.value||'0';
+  ['asmBkfst','asmLunch','asmDinner','asmHS','asmVL','asmSZ','asmPZ','asmGreekBkfst','asmGreekLunch','asmGreekDinner'].forEach(id => {
+    const el = document.getElementById(id); if (el) data[id] = el.value;
+  });
+  saveLocData(loc, data);
+}
+
+function loadLocationData(loc) {
+  const data = getLocData(loc);
+  if (!data || !data.version) return; // no saved data for this location yet
+  if (data.pubData) {
+    allPubData = data.pubData;
+    Object.keys(allPubData).forEach(l => {
+      Object.keys(allPubData[l]).forEach(wk => {
+        const converted = {};
+        Object.entries(allPubData[l][wk]).forEach(([k,v]) => { converted[parseInt(k)] = v; });
+        allPubData[l][wk] = converted;
+      });
+    });
+  }
+  if (data.closedStations) closedStations = data.closedStations;
+  if (data.finalBohData) finalBohData = data.finalBohData;
+  if (data.bestHits) bestHits = data.bestHits;
+  if (data.globalHits) globalHits = data.globalHits;
+  if (data.stagedItems) stagedItems = data.stagedItems;
+  if (data.availableWeeks && data.availableWeeks.length) {
+    availableWeeks = data.availableWeeks;
+    currentWeekKey = data.currentWeekKey || availableWeeks[availableWeeks.length-1];
+  } else {
+    ensureCurrentWeekExists();
+  }
+  if (data.pubActiveDays) pubActiveDays = data.pubActiveDays;
+  if (data.houseRules) houseRules = data.houseRules;
+  if (data.styleSettings) styleSettings = data.styleSettings;
+  if (data.manualKpiValues) manualKpiValues = data.manualKpiValues;
+  if (data.weeklyBudget && document.getElementById('weeklyBudget')) {
+    document.getElementById('weeklyBudget').value = data.weeklyBudget;
+    updateBudgetCalcs();
+  }
+  if (data.maxPremium && document.getElementById('maxPremium')) document.getElementById('maxPremium').value = data.maxPremium;
+  if (data.asmGreekVeg && document.getElementById('asmGreekVeg')) document.getElementById('asmGreekVeg').value = data.asmGreekVeg;
+  if (data.asmGreekVegan && document.getElementById('asmGreekVegan')) document.getElementById('asmGreekVegan').value = data.asmGreekVegan;
+  ['asmBkfst','asmLunch','asmDinner','asmHS','asmVL','asmSZ','asmPZ','asmGreekBkfst','asmGreekLunch','asmGreekDinner'].forEach(id => {
+    if (data[id] && document.getElementById(id)) document.getElementById(id).value = data[id];
+  });
+}
+
 function showChefProfileScreen() {
   const screen = document.getElementById('chefProfileScreen');
   screen.style.display = 'flex';
@@ -1660,95 +1757,29 @@ function switchChef() {
 }
 
 function saveCurrentSession() {
+  // Save location data (shared across all chefs)
+  saveLocationData();
+  // Save chef personal data (name, last location)
   if (!currentChef) return;
   const data = getChefData(currentChef);
-  data.version = STORAGE_VERSION;
   data.lastSaved = new Date().toISOString();
-  data.pubData = allPubData;
-  data.finalBohData = finalBohData;
-  data.bestHits = bestHits;
-  data.globalHits = globalHits;
-  data.stagedItems = stagedItems;
-  data.availableWeeks = availableWeeks;
-  data.currentWeekKey = currentWeekKey;
-  data.pubActiveDays = pubActiveDays;
   data.masterLocation = getLoc();
-  data.styleSettings = styleSettings;
-  data.houseRules = houseRules;
-  data.manualKpiValues = manualKpiValues;
-  data.weeklyBudget = document.getElementById('weeklyBudget')?.value||'';
-  data.maxPremium = document.getElementById('maxPremium')?.value||'3';
-  data.asmGreekVeg = document.getElementById('asmGreekVeg')?.value||'0';
-  data.asmGreekVegan = document.getElementById('asmGreekVegan')?.value||'0';
-  // Save all headcount fields
-  ['asmBkfst','asmLunch','asmDinner','asmHS','asmVL','asmSZ','asmPZ','asmGreekBkfst','asmGreekLunch','asmGreekDinner'].forEach(id => {
-    const el = document.getElementById(id); if (el) data[id] = el.value;
-  });
   saveChefData(currentChef, data);
 }
 
 function loadChefSession(name) {
-  const data = getChefData(name);
-  // Version check — if data is from an old schema, start fresh
-  if (data.version && data.version < STORAGE_VERSION) {
-    console.log('Old data version detected, starting fresh for', name);
-    // Keep style settings and manual kpi values but reset data structures
-    if (data.styleSettings) styleSettings = data.styleSettings;
-    if (data.manualKpiValues) manualKpiValues = data.manualKpiValues;
-    ensureCurrentWeekExists();
-    renderWeekSelector();
-    initPubDays();
-    renderMenuCard();
-    loadStyleSettings();
-    return;
-  }
-  if (data.pubData) {
-    allPubData = data.pubData;
-    // Convert numeric string keys back to integers
-    Object.keys(allPubData).forEach(loc => {
-      Object.keys(allPubData[loc]).forEach(wk => {
-        const converted = {};
-        Object.entries(allPubData[loc][wk]).forEach(([k,v]) => { converted[parseInt(k)] = v; });
-        allPubData[loc][wk] = converted;
-      });
-    });
-  }
-  if (data.finalBohData) finalBohData = data.finalBohData;
-  if (data.bestHits) bestHits = data.bestHits;
-  if (data.globalHits) globalHits = data.globalHits;
-  if (data.stagedItems) stagedItems = data.stagedItems;
-  if (data.availableWeeks && data.availableWeeks.length) {
-    availableWeeks = data.availableWeeks;
-    currentWeekKey = data.currentWeekKey || availableWeeks[availableWeeks.length-1];
-  } else {
-    ensureCurrentWeekExists();
-  }
-  if (data.pubActiveDays) pubActiveDays = data.pubActiveDays;
-  if (data.masterLocation) {
-    document.getElementById('masterLocation').value = data.masterLocation;
-    ['locationSelect','pubLocation','kpiLocation','styleLocation'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.value = data.masterLocation;
-    });
-    updateLocationUI();
-    updateContextPill();
-  }
-  if (data.styleSettings) styleSettings = data.styleSettings;
-  if (data.houseRules) houseRules = data.houseRules;
-  if (data.manualKpiValues) manualKpiValues = data.manualKpiValues;
-  if (data.weeklyBudget && document.getElementById('weeklyBudget')) {
-    document.getElementById('weeklyBudget').value = data.weeklyBudget;
-    updateBudgetCalcs();
-  }
-  if (data.maxPremium && document.getElementById('maxPremium')) {
-    document.getElementById('maxPremium').value = data.maxPremium;
-  }
-  if (data.asmGreekVeg && document.getElementById('asmGreekVeg')) document.getElementById('asmGreekVeg').value = data.asmGreekVeg;
-  if (data.asmGreekVegan && document.getElementById('asmGreekVegan')) document.getElementById('asmGreekVegan').value = data.asmGreekVegan;
-  // Restore headcount fields
-  ['asmBkfst','asmLunch','asmDinner','asmHS','asmVL','asmSZ','asmPZ','asmGreekBkfst','asmGreekLunch','asmGreekDinner'].forEach(id => {
-    if (data[id] && document.getElementById(id)) document.getElementById(id).value = data[id];
+  const chefData = getChefData(name);
+  // Restore last location this chef was on
+  const lastLoc = chefData.masterLocation || 'Hendrick House';
+  document.getElementById('masterLocation').value = lastLoc;
+  ['locationSelect','pubLocation','kpiLocation','styleLocation'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = lastLoc;
   });
+  // Load location data (shared across all chefs)
+  loadLocationData(lastLoc);
+  ensureCurrentWeekExists();
+  updateLocationUI();
+  updateContextPill();
   renderWeekSelector();
   syncAcceptedFromStaged();
   const container = document.getElementById('pubDayList');
@@ -1759,8 +1790,9 @@ function loadChefSession(name) {
   loadStyleSettings();
 }
 
+
 // Auto-save every 60 seconds
-setInterval(() => { if (currentChef) saveCurrentSession(); }, 60000);
+setInterval(() => { saveLocationData(); if (currentChef) { const d = getChefData(currentChef); d.masterLocation = getLoc(); saveChefData(currentChef, d); } }, 60000);
 
 // ══════════════════════════════════════════════
 // WEEK MANAGEMENT
@@ -2054,7 +2086,14 @@ function updateContextPill() {
 }
 
 function onMasterLocationChange() {
-  if (currentChef) saveCurrentSession();
+  // Save current location data before switching
+  saveLocationData();
+  // Save chef's last location
+  if (currentChef) {
+    const data = getChefData(currentChef);
+    data.masterLocation = getLoc();
+    saveChefData(currentChef, data);
+  }
   const loc = document.getElementById('masterLocation').value;
   ['locationSelect','pubLocation','kpiLocation','styleLocation'].forEach(id => {
     const el = document.getElementById(id);
@@ -2065,11 +2104,19 @@ function onMasterLocationChange() {
   document.getElementById('inventoryInput').value = '';
   document.getElementById('bohOutput').innerHTML = '<div class="empty-output">Prep notes<br>appear here</div>';
   // Load staged items for this location+week
+  // Reset location-level state before loading new location
+  allPubData = {}; stagedItems = {}; availableWeeks = []; currentWeekKey = '';
+  closedStations = {}; finalBohData = {}; bestHits = {}; globalHits = [];
+  houseRules = {}; styleSettings = {};
+  // Load the new location's data
+  loadLocationData(loc);
+  ensureCurrentWeekExists();
   syncAcceptedFromStaged();
   updateLocationUI();
   updateContextPill();
   renderMenuCard();
   renderFinalBohSheet();
+  renderWeekSelector();
   loadStyleSettings();
   updateKpiLocation();
 }
@@ -2159,6 +2206,7 @@ This is a single cohesive meal — no stations. Generate 3 complete meals each w
       : '';
 
     if (station === 'Homestyle') {
+      const isLunch = selectedMeal === 'Lunch';
       audienceNote = `Hendrick House residential dining hall — Homestyle station. Large-batch cooking for ~${Math.round(hhCount * 0.6)} students per service.
 
 COOKING CONSTRAINTS — this is large-batch production:
@@ -2168,6 +2216,16 @@ COOKING CONSTRAINTS — this is large-batch production:
 - Examples of what works great: roast chicken, baked salmon, roasted root vegetables, large-batch curries, braised meats, rice dishes, pasta bakes
 - Examples of what does NOT work: pan-seared individual portions, made-to-order stir fry, individually plated proteins
 
+${isLunch ? `LUNCH RULES — students have afternoon classes and need energy, not a food coma:
+- Lighter proteins preferred: chicken breast, fish, legumes, tofu over heavy red meats
+- Avoid very rich, heavy, or cream-based dishes at lunch — save those for dinner
+- Grain bowls, lighter braises, roasted vegetable dishes, lighter curries all work well
+- Dishes should feel energizing and fresh, not sleepy-heavy
+- Do NOT repeat the same dish format as dinner the same day or previous day` : `DINNER RULES — dinner is the main event, richer and more satisfying:
+- Heartier proteins welcome: braised meats, roasted chicken thighs, baked salmon, lamb
+- Richer preparations acceptable: curries, pasta bakes, stews, braises
+- Should feel satisfying and complete after a full day`}
+
 FLAVOR PROFILE:
 - Crowd-pleaser blend of sorority-style freshness and fraternity-style heartiness
 - IMPORTANT: include South Asian dishes regularly — curries, tikka masala, dal, biryani work exceptionally well for large-batch cooking and students love them
@@ -2176,6 +2234,7 @@ FLAVOR PROFILE:
 - Always include a plant-based alternative dish name${ingredientContext}`;
 
     } else if (station === 'Veggie Life') {
+      const isLunch = selectedMeal === 'Lunch';
       // Find what's at Homestyle tonight for ingredient overlap
       const homestyle = hhAccepted.filter(i => i.station === 'Homestyle' && i.meal === selectedMeal);
       const homestyleContext = homestyle.length > 0
@@ -2198,6 +2257,7 @@ CORE RULES:
 - Aim for ~50% spice/ingredient overlap with whatever is at Homestyle tonight
 - Occasionally do a direct vegetarian version (e.g. paneer instead of chicken) but vary it
 - Budget-conscious: lean on legumes, tofu, paneer, eggs — not expensive ingredients
+- ${isLunch ? 'LUNCH: lighter preparations preferred — grain bowls, fresh salads with substance, lighter curries, lentil soups. Avoid heavy cream-based dishes or anything too rich for midday.' : 'DINNER: more substantial preparations welcome — hearty curries, baked dishes, rich stews.'}
 - Health-forward but satisfying and well-flavored
 - Do NOT repeat the same protein on consecutive nights or more than twice in a week
 - Large-batch cooking constraints apply (oven, braise, simmer — not individual portions)${homestyle.length > 0 ? homestyleContext : ingredientContext}`;
@@ -2313,7 +2373,8 @@ STRICT RULES:
 3. TECHNIQUE VARIETY: Vary cooking techniques — avoid 3+ dishes using the same method
 4. CUISINE ROTATION: ${recentCuisines.length ? `The last 1-2 days featured: ${[...new Set(recentCuisines)].join(', ')}. Avoid these same cuisine regions today unless it is a different sub-cuisine.` : 'No recent pattern detected — vary freely.'}
 5. INGREDIENT EFFICIENCY: Where possible, suggest dishes that reuse ingredients already on the menu this week (purchasing efficiency) — but in a different flavor direction
-6. SAME-DAY COHESION: It's good if stations on the same day share ingredients or a loose flavor theme` : '';
+6. SAME-DAY COHESION: It's good if stations on the same day share ingredients or a loose flavor theme
+7. LUNCH vs DINNER CONTRAST: Lunch suggestions must feel distinctly lighter and more energizing than dinner. Do NOT suggest the same dish format at both lunch and dinner on the same day. Lunch = lighter proteins, fresher preparations, grain bowls, wraps. Dinner = heartier, richer, more satisfying.` : '';
 
   const greekMealNote = greek ? `This is a single unified ${selectedMeal} menu for the whole house — not broken into stations.` : '';
 
@@ -2372,7 +2433,7 @@ Respond ONLY with valid JSON:
 {"options":[{"name":"","desc":"","vegAlt":null,"protein":"","cuisine":""},{"name":"","desc":"","vegAlt":null,"protein":"","cuisine":""},{"name":"","desc":"","vegAlt":null,"protein":"","cuisine":""}]}`;
 
   try {
-    const text = await callClaude(prompt, 1200);
+    const text = await callClaude(prompt, 2000);
     const parsed = JSON.parse(text);
     renderSuggestions(parsed.options, station);
   } catch(err) {
@@ -2662,7 +2723,14 @@ function renderBOH(id, name, d) {
     return;
   }
   el.innerHTML=`
-    <div class="boh-card-name">🔪 ${name}</div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:4px;">
+      <div class="boh-card-name">🔪 ${name}</div>
+      <button onclick="editBOH('${id}')"
+        style="background:none;border:1px solid #C8D8C8;color:var(--sage);padding:3px 9px;font-family:'DM Mono',monospace;font-size:0.52rem;letter-spacing:0.08em;border-radius:3px;cursor:pointer;flex-shrink:0;transition:all 0.15s;"
+        onmouseover="this.style.background='var(--sage)';this.style.color='#fff'" onmouseout="this.style.background='none';this.style.color='var(--sage)'">
+        ✏ Edit
+      </button>
+    </div>
     <div class="boh-sec">Ingredients (~${size} portions incl. buffer)</div>
     <ul class="boh-list">${(d.ingredients||[]).map(i=>`<li>${i}</li>`).join('')}</ul>
     <div class="boh-sec">Prep & Cooking Steps</div>
@@ -2674,6 +2742,57 @@ function renderBOH(id, name, d) {
   const staged = getStagedItems();
   const stagedItem = staged.find(i => i.name === name);
   if (stagedItem) { stagedItem._bohData = d; if (currentChef) saveCurrentSession(); }
+}
+
+function editBOH(id) {
+  const el = document.getElementById(id); if(!el) return;
+  const staged = getStagedItems();
+  const name = el.dataset.name || el.querySelector('.boh-card-name')?.textContent?.replace('🔪 ','') || '';
+  const stagedItem = staged.find(i => i.name === name);
+  const d = stagedItem?._bohData || { ingredients:[], steps:[], timing:'', mistakes:[], dietaryAlt:'' };
+
+  el.innerHTML=`
+    <div class="boh-card-name" style="margin-bottom:10px;">✏ Editing: ${name}</div>
+
+    <div class="boh-sec">Ingredients (one per line)</div>
+    <textarea id="edit-ing-${id}" rows="5"
+      style="width:100%;background:#F0F5F0;border:1px solid #C8D8C8;color:var(--ink);padding:7px 9px;font-family:'DM Sans',sans-serif;font-size:0.72rem;line-height:1.6;border-radius:4px;outline:none;resize:vertical;margin-bottom:6px;"
+    >${(d.ingredients||[]).join('\n')}</textarea>
+
+    <div class="boh-sec">Prep & Cooking Steps (one per line)</div>
+    <textarea id="edit-steps-${id}" rows="5"
+      style="width:100%;background:#F0F5F0;border:1px solid #C8D8C8;color:var(--ink);padding:7px 9px;font-family:'DM Sans',sans-serif;font-size:0.72rem;line-height:1.6;border-radius:4px;outline:none;resize:vertical;margin-bottom:6px;"
+    >${(d.steps||[]).join('\n')}</textarea>
+
+    <div class="boh-sec">Key Timing</div>
+    <input type="text" id="edit-timing-${id}" value="${d.timing||''}"
+      style="width:100%;background:#F0F5F0;border:1px solid #C8D8C8;color:var(--ink);padding:7px 9px;font-family:'DM Sans',sans-serif;font-size:0.72rem;border-radius:4px;outline:none;margin-bottom:6px;">
+
+    <div class="boh-sec">Watch Out For (one per line)</div>
+    <textarea id="edit-mistakes-${id}" rows="3"
+      style="width:100%;background:#F0F5F0;border:1px solid #C8D8C8;color:var(--ink);padding:7px 9px;font-family:'DM Sans',sans-serif;font-size:0.72rem;line-height:1.6;border-radius:4px;outline:none;resize:vertical;margin-bottom:10px;"
+    >${(d.mistakes||[]).join('\n')}</textarea>
+
+    <div style="display:flex;gap:8px;">
+      <button onclick="saveBOHEdits('${id}','${name.replace(/'/g,'&apos;')}')"
+        style="background:var(--sage);color:#fff;border:none;padding:7px 16px;font-family:'DM Mono',monospace;font-size:0.58rem;letter-spacing:0.1em;text-transform:uppercase;border-radius:4px;cursor:pointer;">
+        Save
+      </button>
+      <button onclick="retryBOH('${id}','${name.replace(/'/g,'&apos;')}','${el.dataset.station||selectedStation||'Homestyle'}','${document.getElementById('masterLocation').value}',this)"
+        style="background:transparent;border:1px solid #C8D8C8;color:var(--sage);padding:7px 12px;font-family:'DM Mono',monospace;font-size:0.58rem;letter-spacing:0.1em;text-transform:uppercase;border-radius:4px;cursor:pointer;">
+        ↺ Regenerate
+      </button>
+    </div>`;
+}
+
+function saveBOHEdits(id, name) {
+  const ingredients = (document.getElementById(`edit-ing-${id}`)?.value||'').split('\n').map(s=>s.trim()).filter(Boolean);
+  const steps = (document.getElementById(`edit-steps-${id}`)?.value||'').split('\n').map(s=>s.trim()).filter(Boolean);
+  const timing = document.getElementById(`edit-timing-${id}`)?.value?.trim()||'';
+  const mistakes = (document.getElementById(`edit-mistakes-${id}`)?.value||'').split('\n').map(s=>s.trim()).filter(Boolean);
+
+  const d = { ingredients, steps, timing, mistakes };
+  renderBOH(id, name, d);
 }
 
 async function retryBOH(id, name, station, loc, btn) {
@@ -2705,7 +2824,7 @@ Respond ONLY with valid JSON:
 {"ingredients":["item with quantity"],"steps":["step"],"timing":"one sentence","mistakes":["dish-specific mistake"]${dietaryTotal > 0 ? ',"dietaryAlt":"brief description of veg/vegan alternative with adjusted quantities"' : ''}}
 Requirements: 6-10 ingredients with realistic quantities${dietaryTotal > 0 ? ` (main protein for ${meatSize}, not ${size})` : ` for ${size} servings`} · 4-7 steps · 2-3 mistakes`;
   try {
-    const text = await callClaude(prompt, 900);
+    const text = await callClaude(prompt, 1500);
     return JSON.parse(text);
   } catch(e) { return {error:true, ingredients:[],steps:[],timing:'',mistakes:[]}; }
 }
@@ -3102,9 +3221,37 @@ function renderMenuCard() {
   const totalW = 72 + numDays * 130;
   card.style.width = totalW + 'px';
 
+  function isStationClosed(dayIdx, station) {
+    return isStationClosedGlobal(dayIdx, station);
+  }
+
+  // Day headers with station toggle buttons
+  const hhDayHeaders = pubActiveDays.map(di => {
+    const stations = ['Homestyle','Sizzle','Veggie Life','Pizza'];
+    const toggles = stations.map(st => {
+      const closed = isStationClosed(di, st);
+      const shortName = st === 'Veggie Life' ? 'VL' : st === 'Homestyle' ? 'HS' : st === 'Sizzle' ? 'SZ' : 'PZ';
+      return `<span onclick="toggleStationClosed(${di},'${st}')" title="${closed?'Re-enable':'Close'} ${st} on ${DAYS[di]}"
+        style="font-family:'DM Mono',monospace;font-size:0.42rem;letter-spacing:0.04em;cursor:pointer;padding:1px 4px;border-radius:2px;border:1px solid ${closed?'#D0C8BE':'#4A6741'};color:${closed?'#D0C8BE':'#4A6741'};background:${closed?'#F7F3EC':'#F0F5F0'};user-select:none;"
+        >${shortName}</span>`;
+    }).join('');
+    return `<th class="mc-day-th">
+      <div class="mc-day-name">${DAYS[di]}</div>
+      <div class="mc-day-date">${dates[di]||''}</div>
+      <div style="display:flex;gap:2px;justify-content:center;margin-top:3px;flex-wrap:wrap;">${toggles}</div>
+    </th>`;
+  }).join('');
+
   function stationRow(meal, station, rowClass) {
+    const openDays = pubActiveDays.filter(di => !isStationClosed(di, station));
+    if (pubActiveDays.every(di => isStationClosed(di, station))) return '';
     const labelCell = `<td class="mc-row-label"><div class="mc-row-label-inner"><span class="mc-row-station">${station}</span></div></td>`;
-    const cells = pubActiveDays.map(di => cell(di, meal, station)).join('');
+    const cells = pubActiveDays.map(di => {
+      if (isStationClosed(di, station)) {
+        return `<td class="mc-cell" style="background:#F2F0EC;opacity:0.4;"></td>`;
+      }
+      return cell(di, meal, station);
+    }).join('');
     return `<tr class="${rowClass}">${labelCell}${cells}</tr>`;
   }
 
@@ -3115,7 +3262,7 @@ function renderMenuCard() {
       <thead>
         <tr>
           <th style="width:72px;background:#F7F3EC;border:1px solid #E8E2D9;"></th>
-          ${dayHeaders}
+          ${hhDayHeaders}
         </tr>
       </thead>
       <tbody>
@@ -3268,33 +3415,46 @@ async function generateShoppingList(format) {
 
   const loc = getLoc(); const wk = getWeekKey();
 
-  const prompt = `You are a professional kitchen manager. Below is a list of ingredients from multiple dishes on a weekly menu. Each line is prefixed with the dish name in brackets.
+  const prompt = `You are a professional kitchen manager. Below is a list of ingredients from multiple dishes on a weekly menu. Each line is prefixed with the dish name and service in brackets.
 
 Ingredients:
 ${allIngredients.join('\n')}
 
 Your job:
-1. Parse every ingredient line, extracting the item name and quantity
-2. Merge duplicate ingredients across dishes — convert to consistent units before merging (e.g. "2 cups" + "1 pint" = "4 cups"; "1 lb" + "8 oz" = "1.5 lbs"). When units can't be merged (e.g. "3 cloves" vs "2 tbsp minced"), keep the larger/more useful unit and note the conversion
-3. Categorize every ingredient into exactly one of these categories: Proteins, Dairy & Eggs, Produce, Grains Pasta & Bread, Pantry & Spices, Fresh Herbs, Other
-4. Within each category, alphabetize ingredients
-5. Round quantities to practical amounts (e.g. 2.5 lbs not 2.47 lbs)
+1. Parse every ingredient line, keeping it associated with its dish
+2. Categorize every ingredient into exactly one of these categories: Proteins, Dairy & Eggs, Produce, Grains Pasta & Bread, Pantry & Spices, Fresh Herbs, Other
+3. Within each category, group by ingredient name (alphabetical), and list each dish that uses it as a sub-item
+4. At the end of each ingredient group, include a merged total across all dishes
+5. Round quantities to practical amounts
 
 Respond ONLY with valid JSON:
 {
   "categories": [
     {
       "name": "Proteins",
-      "items": [{"ingredient": "Chicken thighs", "quantity": "12 lbs"}, ...]
-    },
-    ...
+      "items": [
+        {
+          "ingredient": "Chicken thighs",
+          "dishes": [
+            {"dish": "Harissa Chicken (Tue Dinner)", "quantity": "8 lbs"},
+            {"dish": "Tikka Masala (Wed Dinner)", "quantity": "10 lbs"}
+          ],
+          "total": "18 lbs"
+        }
+      ]
+    }
   ]
 }
 Include only categories that have at least one item. Use these exact category names: Proteins, Dairy & Eggs, Produce, Grains Pasta & Bread, Pantry & Spices, Fresh Herbs, Other.`;
 
   try {
-    const text = await callClaude(prompt, 2000);
-    const data = JSON.parse(text);
+    const text = await callClaude(prompt, 4000);
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch(parseErr) {
+      throw new Error(`Shopping list response was cut off mid-generation (${parseErr.message}). Try with fewer menus (6 or fewer) or hit retry.`);
+    }
     if (format === 'pdf') {
       exportShoppingListPDF(data, loc, wk);
     } else {
@@ -3314,8 +3474,16 @@ function exportShoppingListPDF(data, loc, wk) {
       <table style="width:100%;border-collapse:collapse;">
         ${cat.items.map((item,i) => `
           <tr style="background:${i%2===0?'#F7F3EC':'#fff'};">
-            <td style="padding:5px 8px;font-family:'DM Sans',sans-serif;font-size:0.82rem;color:#1A1714;">${item.ingredient}</td>
-            <td style="padding:5px 8px;font-family:'DM Mono',sans-serif;font-size:0.78rem;color:#4A4540;text-align:right;white-space:nowrap;">${item.quantity}</td>
+            <td style="padding:5px 8px;font-family:'DM Sans',sans-serif;font-size:0.84rem;font-weight:500;color:#1A1714;" colspan="2">${item.ingredient}</td>
+          </tr>
+          ${(item.dishes||[]).map(d => `
+          <tr style="background:${i%2===0?'#F7F3EC':'#fff'};">
+            <td style="padding:2px 8px 2px 20px;font-family:'DM Sans',sans-serif;font-size:0.74rem;color:#6A6258;">${d.dish}</td>
+            <td style="padding:2px 8px;font-family:'DM Mono',sans-serif;font-size:0.72rem;color:#6A6258;text-align:right;white-space:nowrap;">${d.quantity}</td>
+          </tr>`).join('')}
+          <tr style="background:${i%2===0?'#F0EDE7':'#F7F3EC'};">
+            <td style="padding:3px 8px 5px 8px;font-family:'DM Mono',sans-serif;font-size:0.64rem;letter-spacing:0.08em;text-transform:uppercase;color:#B84C27;">Total</td>
+            <td style="padding:3px 8px 5px;font-family:'DM Mono',sans-serif;font-size:0.74rem;font-weight:600;color:#B84C27;text-align:right;white-space:nowrap;">${item.total||''}</td>
           </tr>`).join('')}
       </table>
     </div>`).join('');
@@ -3350,21 +3518,40 @@ function exportShoppingListPDF(data, loc, wk) {
 
 function exportShoppingListXLSX(data, loc, wk) {
   const wb = XLSX.utils.book_new();
+  // Sheet 1: Per-dish breakdown
   const rows = [
     [`${loc} — Weekly Shopping List — ${weekLabel(wk)}`],
     [],
-    ['Category', 'Ingredient', 'Quantity']
+    ['Category', 'Ingredient', 'Dish', 'Quantity']
   ];
   data.categories.forEach(cat => {
     cat.items.forEach(item => {
-      rows.push([cat.name, item.ingredient, item.quantity]);
+      (item.dishes||[]).forEach((d, i) => {
+        rows.push([i===0?cat.name:'', i===0?item.ingredient:'', d.dish, d.quantity]);
+      });
+      rows.push(['', '', 'TOTAL', item.total||'']);
+      rows.push([]);
     });
-    rows.push([]); // blank row between categories
+    rows.push([]);
   });
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  // Column widths
-  ws['!cols'] = [{wch:22},{wch:32},{wch:16}];
-  XLSX.utils.book_append_sheet(wb, ws, 'Shopping List');
+  ws['!cols'] = [{wch:22},{wch:28},{wch:32},{wch:16}];
+  XLSX.utils.book_append_sheet(wb, ws, 'By Dish');
+  // Sheet 2: Merged totals only (for the actual order call)
+  const totRows = [
+    [`${loc} — Order Totals — ${weekLabel(wk)}`],
+    [],
+    ['Category', 'Ingredient', 'Total Quantity']
+  ];
+  data.categories.forEach(cat => {
+    cat.items.forEach(item => {
+      totRows.push([cat.name, item.ingredient, item.total||'']);
+    });
+    totRows.push([]);
+  });
+  const ws2 = XLSX.utils.aoa_to_sheet(totRows);
+  ws2['!cols'] = [{wch:22},{wch:32},{wch:16}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Order Totals');
   XLSX.writeFile(wb, `ShoppingList_${loc.replace(/\s/g,'_')}_${wk}.xlsx`);
 }
 
